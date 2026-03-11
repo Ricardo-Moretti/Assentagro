@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" \"c:/projetos/AssentAgro/installer.iss\")",
+      "Bash(mkdir -p c:/projetos/AssentAgro/src/assets)",
+      "Bash(cp c:/projetos/AssentAgro/image_login.jpg c:/projetos/AssentAgro/src/assets/image_login.jpg)",
+      "Read(//c/projetos/AssentAgro/**)"
+    ]
+  }
+}

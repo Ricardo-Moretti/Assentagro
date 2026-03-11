@@ -1,0 +1,82 @@
+use anyhow::{Context, Result};
+use log::info;
+use mysql::prelude::*;
+use mysql::*;
+use std::path::Path;
+
+use super::migrations::executar_migracoes;
+
+/// Configuração de conexão MySQL
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DbConfig {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+}
+
+impl Default for DbConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 3306,
+            user: "assetagro".to_string(),
+            password: "AssetAgro@2025!".to_string(),
+            database: "assetagro".to_string(),
+        }
+    }
+}
+
+/// Carrega configuração do arquivo db_config.json ou usa padrão
+pub fn carregar_config(diretorio_app: &Path) -> DbConfig {
+    let config_path = diretorio_app.join("db_config.json");
+
+    if config_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if let Ok(config) = serde_json::from_str::<DbConfig>(&content) {
+                info!("Configuração MySQL carregada de: {:?}", config_path);
+                return config;
+            }
+        }
+    }
+
+    // Se não existe, cria arquivo padrão para o usuário editar
+    let default_config = DbConfig::default();
+    let _ = std::fs::create_dir_all(diretorio_app);
+    let json = serde_json::to_string_pretty(&default_config).unwrap_or_default();
+    let _ = std::fs::write(&config_path, &json);
+    info!("Arquivo db_config.json criado com valores padrão em: {:?}", config_path);
+
+    default_config
+}
+
+/// Inicializa a conexão MySQL
+pub fn inicializar_banco(diretorio_app: &Path) -> Result<Pool> {
+    std::fs::create_dir_all(diretorio_app)
+        .with_context(|| format!("Falha ao criar diretório: {:?}", diretorio_app))?;
+
+    let config = carregar_config(diretorio_app);
+
+    let url = format!(
+        "mysql://{}:{}@{}:{}/{}",
+        config.user, config.password, config.host, config.port, config.database
+    );
+
+    info!("Conectando ao MySQL em {}:{}...", config.host, config.port);
+
+    let pool = Pool::new(url.as_str())
+        .context("Falha ao conectar ao MySQL. Verifique db_config.json")?;
+
+    // Testa conexão
+    let mut conn = pool.get_conn().context("Falha ao obter conexão do pool")?;
+
+    // Configura charset
+    conn.query_drop("SET NAMES utf8mb4").context("Falha ao configurar charset")?;
+
+    // Executa migrações
+    executar_migracoes(&mut conn).context("Falha ao executar migrações")?;
+
+    info!("Banco MySQL inicializado com sucesso.");
+    Ok(pool)
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tauri:*)",
+      "Bash(npm create:*)",
+      "Bash(npx --yes @tauri-apps/cli icon:*)",
+      "Bash(npx @tauri-apps/cli icon:*)",
+      "Read(//c/projetos/AssentAgro/src-tauri/**)",
+      "Bash(npx --yes @aspect-build/rules_js:*)",
+      "Bash(\"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" installer.iss)"
+    ],
+    "additionalDirectories": [
+      "C:\\projetos\\AssentAgro\\src-tauri\\$APPDATA\\com.tracbelagro.assetagro"
+    ]
+  }
+}
