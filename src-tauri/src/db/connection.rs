@@ -19,7 +19,7 @@ pub struct DbConfig {
 impl Default for DbConfig {
     fn default() -> Self {
         Self {
-            host: "127.0.0.1".to_string(),
+            host: "192.168.90.5".to_string(),
             port: 3306,
             user: "assetagro".to_string(),
             password: "AssetAgro@2025!".to_string(),
