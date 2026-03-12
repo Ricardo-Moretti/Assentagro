@@ -24,7 +24,8 @@ def escape_mysql(val):
 
 def export_table(cursor, table_name, columns, output):
     """Exporta todos os registros de uma tabela"""
-    cursor.execute(f"SELECT * FROM {table_name}")
+    col_select = ", ".join(columns)
+    cursor.execute(f"SELECT {col_select} FROM {table_name}")
     rows = cursor.fetchall()
 
     if not rows:
