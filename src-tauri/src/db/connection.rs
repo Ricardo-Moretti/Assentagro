@@ -3,6 +3,7 @@ use log::info;
 use mysql::prelude::*;
 use mysql::*;
 use std::path::Path;
+use std::time::Duration;
 
 use super::migrations::executar_migracoes;
 
@@ -58,14 +59,19 @@ pub fn inicializar_banco(diretorio_app: &Path) -> Result<Pool> {
 
     let config = carregar_config(diretorio_app);
 
-    let url = format!(
-        "mysql://{}:{}@{}:{}/{}",
-        config.user, config.password, config.host, config.port, config.database
-    );
-
     info!("Conectando ao MySQL em {}:{}...", config.host, config.port);
 
-    let pool = Pool::new(url.as_str())
+    let opts = OptsBuilder::new()
+        .ip_or_hostname(Some(&config.host))
+        .tcp_port(config.port)
+        .user(Some(&config.user))
+        .pass(Some(&config.password))
+        .db_name(Some(&config.database))
+        .tcp_connect_timeout(Some(Duration::from_secs(5)))
+        .read_timeout(Some(Duration::from_secs(10)))
+        .write_timeout(Some(Duration::from_secs(10)));
+
+    let pool = Pool::new(opts)
         .context("Falha ao conectar ao MySQL. Verifique db_config.json")?;
 
     // Testa conexão
