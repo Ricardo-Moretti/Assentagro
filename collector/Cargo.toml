@@ -1,0 +1,16 @@
+[package]
+name = "assetagro-collector"
+version = "1.0.0"
+edition = "2021"
+description = "AssetAgro — Coletor automático de hardware"
+
+[dependencies]
+mysql = "25"
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
