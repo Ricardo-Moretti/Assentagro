@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, User, Eye, EyeOff, Monitor, Loader2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Loader2, Tractor, Shield } from 'lucide-react';
 import { autenticarUsuario } from '@/data/commands';
 import { useAuthStore } from '@/stores/useAuthStore';
 import loginBg from '@/assets/image_login.jpg';
@@ -43,13 +43,27 @@ export const LoginPage: React.FC = () => {
           alt="Tracbel Agro"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-agro-950/90 via-agro-900/40 to-transparent" />
         <div className="relative z-10 flex flex-col justify-end p-12 text-white">
-          <h2 className="text-4xl font-bold mb-2">AssetAgro</h2>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-lg">
+              <Tractor className="h-6 w-6 text-agro-900" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold tracking-wide">AssetAgro</h2>
+              <p className="text-sm text-gold-300 font-medium">Tracbel Agro</p>
+            </div>
+          </div>
           <p className="text-lg text-white/80">
-            Gestão de Ativos de TI — Tracbel Agro
+            Sistema de Gestão de Ativos de TI
           </p>
-          <p className="text-sm text-white/50 mt-1">v0.5.0</p>
+          <div className="flex items-center gap-4 mt-4">
+            <div className="flex items-center gap-1.5 text-xs text-white/50">
+              <Shield className="h-3.5 w-3.5" />
+              <span>Conexão Segura</span>
+            </div>
+            <span className="text-xs text-white/30">v0.6.0</span>
+          </div>
         </div>
       </div>
 
@@ -63,12 +77,12 @@ export const LoginPage: React.FC = () => {
         >
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-agro-600 flex items-center justify-center shadow-lg">
-              <Monitor className="h-6 w-6 text-white" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-agro-600 to-agro-800 flex items-center justify-center shadow-lg shadow-agro-600/20">
+              <Tractor className="h-6 w-6 text-gold-300" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white">AssetAgro</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Tracbel Agro — TI</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Tracbel Agro — Departamento de TI</p>
             </div>
           </div>
 
@@ -143,7 +157,7 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 px-4 rounded-xl bg-agro-600 hover:bg-agro-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-agro-600/20"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-agro-600 to-agro-700 hover:from-agro-700 hover:to-agro-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-agro-600/25"
               >
                 {loading ? (
                   <>
@@ -158,7 +172,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-400 text-center mt-6">
-            AssetAgro v0.5.0 — Tracbel Agro
+            AssetAgro v0.6.0 — Tracbel Agro
           </p>
         </motion.div>
       </div>

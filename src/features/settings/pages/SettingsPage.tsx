@@ -139,16 +139,44 @@ export const SettingsPage: React.FC = () => {
 
       {/* Sobre */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">
-          Sobre
-        </h3>
-        <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
-          <p><strong>AssetAgro</strong> — Gestão de Ativos de TI</p>
-          <p>Versão 0.5.0</p>
-          <p>Tracbel Agro — Todos os direitos reservados</p>
-          {lastAccess && (
-            <p>Último acesso: {lastAccess}</p>
-          )}
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-agro-600 to-agro-800 flex items-center justify-center shadow-lg flex-shrink-0">
+            <Monitor className="h-7 w-7 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+              AssetAgro
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Sistema de Gestão de Ativos de TI
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Versão</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">0.6.0</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Banco de Dados</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">MySQL 8.0</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Servidor</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">192.168.90.5</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Último Acesso</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{lastAccess || '—'}</p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Desenvolvido para Tracbel Agro — Departamento de TI
+              </p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                © 2025 Tracbel Agro. Todos os direitos reservados.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

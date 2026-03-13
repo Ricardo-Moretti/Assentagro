@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Menu, Moon, Sun, PlusCircle, Search, X } from 'lucide-react';
+import { Menu, Moon, Sun, PlusCircle, Search, X, LogOut, UserCircle } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useThemeStore } from '@/stores/useThemeStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { Button } from '@/components/ui/Button';
-import { listarAtivos } from '@/data/commands';
+import { listarAtivos, verificarConexao } from '@/data/commands';
 import { cn } from '@/lib/utils';
 import type { AppView, Asset } from '@/domain/models';
 
@@ -18,6 +19,7 @@ const VIEW_TITLES: Record<AppView, string> = {
   movements: 'Movimentações',
   audit: 'Auditoria',
   training: 'Notebooks de Treinamento',
+  users: 'Gerenciar Usuários',
   settings: 'Configurações',
   help: 'Ajuda',
 };
@@ -25,7 +27,9 @@ const VIEW_TITLES: Record<AppView, string> = {
 export const Topbar: React.FC = () => {
   const { currentView, toggleSidebar, navigateTo, viewAsset } = useAppStore();
   const { theme, setTheme } = useThemeStore();
+  const { user, logout } = useAuthStore();
 
+  const [connected, setConnected] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<Asset[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -73,6 +77,18 @@ export const Topbar: React.FC = () => {
     setResults([]);
     setShowDropdown(false);
   };
+
+  // Check MySQL connection status every 30 seconds
+  useEffect(() => {
+    const checkConnection = () => {
+      verificarConexao()
+        .then(() => setConnected(true))
+        .catch(() => setConnected(false));
+    };
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -159,6 +175,20 @@ export const Topbar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Connection status indicator */}
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" title={connected ? 'Conectado ao servidor' : 'Sem conexão com o servidor'}>
+          <div className={cn(
+            'h-2 w-2 rounded-full',
+            connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+          )} />
+          <span className={cn(
+            'text-xs font-medium',
+            connected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+          )}>
+            {connected ? 'Online' : 'Offline'}
+          </span>
+        </div>
+
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -170,6 +200,23 @@ export const Topbar: React.FC = () => {
             <Moon className="h-5 w-5 text-slate-500" />
           )}
         </button>
+
+        {/* User info */}
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <UserCircle className="h-5 w-5 text-slate-400" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {user?.name || user?.username || 'Usuário'}
+            </span>
+          </div>
+          <button
+            onClick={logout}
+            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors group"
+            title="Sair do sistema"
+          >
+            <LogOut className="h-4 w-4 text-slate-400 group-hover:text-red-500" />
+          </button>
+        </div>
 
         {currentView !== 'asset-new' && (
           <Button

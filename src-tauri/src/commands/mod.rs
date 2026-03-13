@@ -495,3 +495,13 @@ pub fn desativar_usuario(state: State<'_, AppState>, id: String) -> Result<(), S
 pub fn escrever_arquivo(caminho: String, dados: Vec<u8>) -> Result<(), String> {
     std::fs::write(&caminho, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
 }
+
+// ============================================================
+// Verificação de conexão
+// ============================================================
+
+#[tauri::command]
+pub fn verificar_conexao(state: State<'_, AppState>) -> Result<bool, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::verificar_conexao(&mut conn)
+}

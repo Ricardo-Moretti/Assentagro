@@ -9,6 +9,7 @@ import {
   ArrowLeftRight,
   ClipboardList,
   GraduationCap,
+  Users,
   Settings,
   HelpCircle,
   Tractor,
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { view: 'movements', label: 'Movimentações', icon: <ArrowLeftRight className="h-5 w-5" /> },
   { view: 'audit', label: 'Auditoria', icon: <ClipboardList className="h-5 w-5" /> },
   { view: 'training', label: 'Treinamento', icon: <GraduationCap className="h-5 w-5" /> },
+  { view: 'users', label: 'Usuários', icon: <Users className="h-5 w-5" /> },
 ];
 
 const bottomItems: NavItem[] = [
@@ -65,15 +67,15 @@ export const Sidebar: React.FC = () => {
       className="w-60 h-full flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800"
     >
       {/* Logo — Tracbel Agro */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-agro-900 to-agro-800 dark:from-agro-950 dark:to-agro-900">
-        <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-white/20 text-white backdrop-blur-sm">
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-gold-600/20 dark:border-gold-900/30 bg-gradient-to-br from-agro-900 via-agro-800 to-agro-900 dark:from-agro-950 dark:via-agro-900 dark:to-agro-950">
+        <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 text-agro-900 shadow-lg shadow-gold-500/20">
           <Tractor className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-base font-bold text-white">
+          <h1 className="text-base font-bold text-white tracking-wide">
             AssetAgro
           </h1>
-          <p className="text-[10px] text-agro-200 leading-tight">
+          <p className="text-[10px] text-gold-300 leading-tight font-medium">
             Tracbel Agro — TI
           </p>
         </div>

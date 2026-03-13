@@ -23,6 +23,7 @@ import { AuditPage } from '@/features/audit/pages/AuditPage';
 import { SettingsPage } from '@/features/settings/pages/SettingsPage';
 import { HelpPage } from '@/features/help/pages/HelpPage';
 import { TrainingPage } from '@/features/training/pages/TrainingPage';
+import { UsersPage } from '@/features/users/pages/UsersPage';
 import { verificarBackupAutomatico, registrarAcesso } from '@/data/commands';
 
 const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
@@ -47,6 +48,8 @@ const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
       return <AuditPage />;
     case 'training':
       return <TrainingPage />;
+    case 'users':
+      return <UsersPage />;
     case 'settings':
       return <SettingsPage />;
     case 'help':

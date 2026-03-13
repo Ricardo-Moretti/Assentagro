@@ -1866,3 +1866,9 @@ pub fn desativar_usuario(conn: &mut PooledConn, id: &str) -> Result<()> {
     )?;
     Ok(())
 }
+
+pub fn verificar_conexao(conn: &mut PooledConn) -> Result<bool, String> {
+    conn.query_drop("SELECT 1")
+        .map(|_| true)
+        .map_err(|e| e.to_string())
+}

@@ -21,6 +21,7 @@ export type AppView =
   | 'movements'
   | 'audit'
   | 'training'
+  | 'users'
   | 'settings'
   | 'help';
 

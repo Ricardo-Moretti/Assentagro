@@ -225,3 +225,7 @@ export const desativarUsuario = (id: string): Promise<void> =>
 // Utilitário — escrita de arquivo binário
 export const escreverArquivo = (caminho: string, dados: number[]): Promise<void> =>
   invoke('escrever_arquivo', { caminho, dados });
+
+// Verificação de conexão
+export const verificarConexao = (): Promise<boolean> =>
+  invoke('verificar_conexao');
