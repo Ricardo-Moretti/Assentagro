@@ -228,7 +228,7 @@ const AddTrainingModal: React.FC<{
           <h3 className="text-base font-semibold text-slate-900 dark:text-white">
             Adicionar Notebook ao Treinamento
           </h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <button onClick={onClose} title="Fechar" className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             <X className="h-4 w-4 text-slate-500" />
           </button>
         </div>
@@ -248,6 +248,7 @@ const AddTrainingModal: React.FC<{
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
+              title="Filtrar por filial"
               className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-agro-500"
             >
               <option value="">Todas as Filiais</option>

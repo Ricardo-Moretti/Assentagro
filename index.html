@@ -7,64 +7,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>AssetAgro — Gestão de Ativos de TI</title>
-    <style>
-      #splash {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #166534 0%, #14532d 100%);
-        transition: opacity 0.4s ease;
-      }
-      #splash.fade-out {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #splash .logo-icon {
-        width: 64px;
-        height: 64px;
-        background: rgba(255,255,255,0.15);
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 16px;
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
-      }
-      #splash .logo-icon svg {
-        width: 36px;
-        height: 36px;
-        color: white;
-      }
-      #splash h1 {
-        font-family: 'Inter', sans-serif;
-        font-size: 24px;
-        font-weight: 700;
-        color: white;
-        margin: 0 0 4px 0;
-      }
-      #splash p {
-        font-family: 'Inter', sans-serif;
-        font-size: 12px;
-        color: rgba(187,247,208,0.8);
-        margin: 0 0 32px 0;
-      }
-      #splash .spinner {
-        width: 32px;
-        height: 32px;
-        border: 3px solid rgba(255,255,255,0.2);
-        border-top-color: white;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
+    <link rel="stylesheet" href="/src/splash.css" />
   </head>
   <body class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100">
     <!-- Splash screen -->

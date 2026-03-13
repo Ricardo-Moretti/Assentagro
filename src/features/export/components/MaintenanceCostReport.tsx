@@ -52,6 +52,7 @@ export const MaintenanceCostReport: React.FC = () => {
             type="date"
             value={inicio}
             onChange={(e) => setInicio(e.target.value)}
+            title="Data inicial"
             className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
           />
         </div>
@@ -61,6 +62,7 @@ export const MaintenanceCostReport: React.FC = () => {
             type="date"
             value={fim}
             onChange={(e) => setFim(e.target.value)}
+            title="Data final"
             className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
           />
         </div>
