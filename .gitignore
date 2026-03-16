@@ -26,3 +26,7 @@ src-tauri/gen/
 
 # Logs
 *.log
+
+# Tauri signing keys (nunca versionar)
+src-tauri/*.key
+src-tauri/*.key.pub

@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useThemeStore } from '@/stores/useThemeStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useUpdater } from '@/hooks/useUpdater';
 import { OnboardingTour } from '@/components/ui/OnboardingTour';
 import { LoginPage } from '@/features/auth/LoginPage';
 import type { AppView } from '@/domain/models';
@@ -72,6 +73,9 @@ export const App: React.FC = () => {
 
   // Atalhos de teclado (#12)
   useKeyboardShortcuts();
+
+  // Auto-atualização via servidor interno
+  useUpdater();
 
   // Aplica tema no mount
   useEffect(() => {
