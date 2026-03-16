@@ -1872,3 +1872,201 @@ pub fn verificar_conexao(conn: &mut PooledConn) -> Result<bool, String> {
         .map(|_| true)
         .map_err(|e| e.to_string())
 }
+
+// ============================================================
+// Empréstimos / Retiradas
+// ============================================================
+
+fn row_to_loan(row: mysql::Row) -> AssetLoan {
+    AssetLoan {
+        id:                row.get(0).unwrap_or_default(),
+        asset_id:          row.get(1).unwrap_or_default(),
+        tipo:              row.get(2).unwrap_or_default(),
+        responsavel:       row.get(3).unwrap_or_default(),
+        contato:           row.get(4),
+        destino:           row.get(5).unwrap_or_default(),
+        destino_branch_id: row.get(6),
+        data_saida:        row.get(7).unwrap_or_default(),
+        previsao_retorno:  row.get(8),
+        data_retorno:      row.get(9),
+        status:            row.get(10).unwrap_or_default(),
+        observacoes:       row.get::<Option<String>, _>(11).unwrap_or_default().unwrap_or_default(),
+        registrado_por:    row.get(12),
+        created_at:        row.get(13).unwrap_or_default(),
+        updated_at:        row.get(14).unwrap_or_default(),
+        service_tag:       row.get(15),
+        asset_model:       row.get(16),
+    }
+}
+
+const LOAN_SELECT: &str = "
+    SELECT l.id, l.asset_id, l.tipo, l.responsavel, l.contato,
+           l.destino, l.destino_branch_id, l.data_saida, l.previsao_retorno,
+           l.data_retorno, l.status, l.observacoes, l.registrado_por,
+           l.created_at, l.updated_at,
+           a.service_tag, a.model AS asset_model
+    FROM asset_loans l
+    LEFT JOIN assets a ON l.asset_id = a.id";
+
+pub fn criar_emprestimo(conn: &mut PooledConn, dto: &CreateLoanDto) -> Result<AssetLoan> {
+    let id  = uuid::Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "INSERT INTO asset_loans
+            (id, asset_id, tipo, responsavel, contato, destino, destino_branch_id,
+             data_saida, previsao_retorno, data_retorno, status, observacoes,
+             registrado_por, created_at, updated_at)
+         VALUES (:id,:asset_id,:tipo,:responsavel,:contato,:destino,:destino_branch_id,
+                 :data_saida,:previsao_retorno,NULL,'ATIVO',:observacoes,
+                 :registrado_por,:created_at,:updated_at)",
+        params! {
+            "id"                => &id,
+            "asset_id"          => &dto.asset_id,
+            "tipo"              => &dto.tipo,
+            "responsavel"       => &dto.responsavel,
+            "contato"           => &dto.contato,
+            "destino"           => &dto.destino,
+            "destino_branch_id" => &dto.destino_branch_id,
+            "data_saida"        => &dto.data_saida,
+            "previsao_retorno"  => &dto.previsao_retorno,
+            "observacoes"       => dto.observacoes.as_deref().unwrap_or(""),
+            "registrado_por"    => &dto.registrado_por,
+            "created_at"        => &now,
+            "updated_at"        => &now,
+        },
+    ).context("Falha ao criar empréstimo")?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE l.id = ?", LOAN_SELECT), (&id,)
+    )?.context("Empréstimo não encontrado após inserção")?;
+
+    Ok(row_to_loan(row))
+}
+
+pub fn devolver_emprestimo(conn: &mut PooledConn, id: &str, observacoes: Option<&str>) -> Result<AssetLoan> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    let obs_update = if let Some(obs) = observacoes {
+        format!(", observacoes = CONCAT(observacoes, '\n[Devolução] {}')", obs.replace('\'', "\\'"))
+    } else {
+        String::new()
+    };
+
+    conn.exec_drop(
+        &format!(
+            "UPDATE asset_loans SET status = 'DEVOLVIDO', data_retorno = ?, updated_at = ? {} WHERE id = ?",
+            obs_update
+        ),
+        (&now, &now, id),
+    ).context("Falha ao registrar devolução")?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE l.id = ?", LOAN_SELECT), (id,)
+    )?.context("Empréstimo não encontrado")?;
+
+    Ok(row_to_loan(row))
+}
+
+pub fn listar_emprestimos(
+    conn: &mut PooledConn,
+    status_filter: Option<&str>,
+    asset_id: Option<&str>,
+) -> Result<Vec<AssetLoan>> {
+    let mut conditions = Vec::new();
+    if let Some(s) = status_filter {
+        // Suporte a filtro ATRASADO: ativos com previsão vencida
+        if s == "ATRASADO" {
+            conditions.push("l.status = 'ATIVO' AND l.previsao_retorno IS NOT NULL AND l.previsao_retorno < NOW()".to_string());
+        } else {
+            conditions.push(format!("l.status = '{}'", s.replace('\'', "\\'")));
+        }
+    }
+    if let Some(a) = asset_id {
+        conditions.push(format!("l.asset_id = '{}'", a.replace('\'', "\\'")));
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", conditions.join(" AND "))
+    };
+
+    let sql = format!("{}{} ORDER BY l.data_saida DESC", LOAN_SELECT, where_clause);
+    let rows: Vec<mysql::Row> = conn.query(sql).context("Falha ao listar empréstimos")?;
+    Ok(rows.into_iter().map(row_to_loan).collect())
+}
+
+pub fn excluir_emprestimo(conn: &mut PooledConn, id: &str) -> Result<()> {
+    conn.exec_drop("DELETE FROM asset_loans WHERE id = ?", (id,))
+        .context("Falha ao excluir empréstimo")
+}
+
+// ============================================================
+// Observações / Notas
+// ============================================================
+
+fn row_to_nota(row: mysql::Row) -> Nota {
+    Nota {
+        id:         row.get(0).unwrap_or_default(),
+        titulo:     row.get::<Option<String>, _>(1).unwrap_or_default().unwrap_or_default(),
+        corpo:      row.get(2).unwrap_or_default(),
+        categoria:  row.get(3).unwrap_or_default(),
+        autor:      row.get::<Option<String>, _>(4).unwrap_or_default().unwrap_or_default(),
+        created_at: row.get(5).unwrap_or_default(),
+        updated_at: row.get(6).unwrap_or_default(),
+    }
+}
+
+pub fn listar_notas(conn: &mut PooledConn, categoria: Option<&str>) -> Result<Vec<Nota>> {
+    let sql = match categoria {
+        Some(c) => format!(
+            "SELECT id, titulo, corpo, categoria, autor, created_at, updated_at
+             FROM notes WHERE categoria = '{}' ORDER BY created_at DESC",
+            c.replace('\'', "\\'")
+        ),
+        None => "SELECT id, titulo, corpo, categoria, autor, created_at, updated_at
+                 FROM notes ORDER BY created_at DESC".to_string(),
+    };
+    let rows: Vec<mysql::Row> = conn.query(sql).context("Falha ao listar notas")?;
+    Ok(rows.into_iter().map(row_to_nota).collect())
+}
+
+pub fn criar_nota(conn: &mut PooledConn, dto: &CreateNotaDto) -> Result<Nota> {
+    let id  = uuid::Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "INSERT INTO notes (id, titulo, corpo, categoria, autor, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (&id, &dto.titulo, &dto.corpo, &dto.categoria, &dto.autor, &now, &now),
+    ).context("Falha ao criar nota")?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        "SELECT id, titulo, corpo, categoria, autor, created_at, updated_at FROM notes WHERE id = ?",
+        (&id,),
+    )?.context("Nota não encontrada após inserção")?;
+
+    Ok(row_to_nota(row))
+}
+
+pub fn atualizar_nota(conn: &mut PooledConn, id: &str, titulo: &str, corpo: &str, categoria: &str) -> Result<Nota> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "UPDATE notes SET titulo = ?, corpo = ?, categoria = ?, updated_at = ? WHERE id = ?",
+        (titulo, corpo, categoria, &now, id),
+    ).context("Falha ao atualizar nota")?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        "SELECT id, titulo, corpo, categoria, autor, created_at, updated_at FROM notes WHERE id = ?",
+        (id,),
+    )?.context("Nota não encontrada")?;
+
+    Ok(row_to_nota(row))
+}
+
+pub fn excluir_nota(conn: &mut PooledConn, id: &str) -> Result<()> {
+    conn.exec_drop("DELETE FROM notes WHERE id = ?", (id,))
+        .context("Falha ao excluir nota")
+}

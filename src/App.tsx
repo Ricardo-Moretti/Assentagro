@@ -24,6 +24,8 @@ import { SettingsPage } from '@/features/settings/pages/SettingsPage';
 import { HelpPage } from '@/features/help/pages/HelpPage';
 import { TrainingPage } from '@/features/training/pages/TrainingPage';
 import { UsersPage } from '@/features/users/pages/UsersPage';
+import { LoansPage } from '@/features/loans/pages/LoansPage';
+import { NotesPage } from '@/features/notes/pages/NotesPage';
 import { verificarBackupAutomatico, registrarAcesso } from '@/data/commands';
 
 const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
@@ -48,6 +50,10 @@ const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
       return <AuditPage />;
     case 'training':
       return <TrainingPage />;
+    case 'loans':
+      return <LoansPage />;
+    case 'notes':
+      return <NotesPage />;
     case 'users':
       return <UsersPage />;
     case 'settings':

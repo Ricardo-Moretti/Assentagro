@@ -1,5 +1,8 @@
 use mysql::prelude::*;
 use mysql::*;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 use mysql::params;
@@ -9,24 +12,79 @@ const MYSQL_HOST: &str = "192.168.90.5";
 const MYSQL_PORT: u16 = 3306;
 const MYSQL_USER: &str = "assetagro";
 const MYSQL_PASS: &str = "AssetAgro@2025!";
-const MYSQL_DB: &str = "assetagro";
+const MYSQL_DB:   &str = "assetagro";
 
-const BRANCH_PENDENTE_ID: &str = "br-pendente";
+const BRANCH_PENDENTE_ID:   &str = "br-pendente";
 const BRANCH_PENDENTE_NAME: &str = "Pendente";
+
+// ── Log de arquivo ─────────────────────────────────────────────────
+// Grava em C:\ProgramData\AssetAgro\collector.log
+// Rotaciona automaticamente quando ultrapassa 1 MB (mantém .bak)
+
+struct Logger {
+    file: Option<fs::File>,
+}
+
+impl Logger {
+    fn new() -> Self {
+        let path = log_path();
+
+        // Rotação: se passar de 1 MB, renomeia para .bak e começa novo
+        if let Ok(meta) = fs::metadata(&path) {
+            if meta.len() > 1_000_000 {
+                let bak = path.with_extension("log.bak");
+                let _ = fs::rename(&path, &bak);
+            }
+        }
+
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .ok();
+
+        Logger { file }
+    }
+
+    /// Imprime no console E grava no arquivo
+    fn log(&mut self, msg: &str) {
+        println!("{}", msg);
+        if let Some(ref mut f) = self.file {
+            let _ = writeln!(f, "{}", msg);
+        }
+    }
+
+    /// Grava apenas no arquivo (sem imprimir no console)
+    fn log_file(&mut self, msg: &str) {
+        if let Some(ref mut f) = self.file {
+            let _ = writeln!(f, "{}", msg);
+        }
+    }
+
+    fn separador(&mut self) {
+        self.log_file("─────────────────────────────────────────────────────");
+    }
+}
+
+fn log_path() -> PathBuf {
+    let dir = PathBuf::from(r"C:\ProgramData\AssetAgro");
+    let _ = fs::create_dir_all(&dir);
+    dir.join("collector.log")
+}
 
 // ── Estrutura de dados coletados ───────────────────────────────────
 #[derive(Debug)]
 struct HardwareInfo {
-    service_tag: String,
-    equipment_type: String, // NOTEBOOK ou DESKTOP
-    model: String,
-    cpu: String,
-    ram_gb: i64,
+    service_tag:        String,
+    equipment_type:     String, // NOTEBOOK ou DESKTOP
+    model:              String,
+    cpu:                String,
+    ram_gb:             i64,
     storage_capacity_gb: i64,
-    storage_type: String, // SSD_NVME, SSD_SATA, HDD
-    os: String,
-    employee_name: String, // username Windows
-    hostname: String,
+    storage_type:       String, // SSD_NVME, SSD_SATA, HDD
+    os:                 String,
+    employee_name:      String, // username Windows
+    hostname:           String,
 }
 
 // ── Funções de coleta via PowerShell/WMI ───────────────────────────
@@ -43,16 +101,10 @@ fn run_powershell(cmd: &str) -> String {
 }
 
 fn get_service_tag() -> String {
-    let tag = run_powershell(
-        "(Get-WmiObject Win32_BIOS).SerialNumber"
-    );
+    let tag = run_powershell("(Get-WmiObject Win32_BIOS).SerialNumber");
     if tag.is_empty() || tag.to_uppercase().contains("NONE") || tag.to_uppercase().contains("DEFAULT") {
-        // Fallback: tenta pelo chassis
-        let alt = run_powershell(
-            "(Get-WmiObject Win32_SystemEnclosure).SerialNumber"
-        );
+        let alt = run_powershell("(Get-WmiObject Win32_SystemEnclosure).SerialNumber");
         if alt.is_empty() || alt.to_uppercase().contains("NONE") {
-            // Último recurso: hostname
             get_hostname()
         } else {
             alt
@@ -63,7 +115,6 @@ fn get_service_tag() -> String {
 }
 
 fn get_equipment_type() -> String {
-    // ChassisTypes: 9,10,14 = Laptop; 3,6,7 = Desktop
     let chassis = run_powershell(
         "(Get-WmiObject Win32_SystemEnclosure).ChassisTypes | Select-Object -First 1"
     );
@@ -75,36 +126,28 @@ fn get_equipment_type() -> String {
 }
 
 fn get_model() -> String {
-    let model = run_powershell(
-        "(Get-WmiObject Win32_ComputerSystem).Model"
-    );
+    let model = run_powershell("(Get-WmiObject Win32_ComputerSystem).Model");
     if model.is_empty() { "Desconhecido".to_string() } else { model }
 }
 
 fn get_cpu() -> String {
-    let cpu = run_powershell(
-        "(Get-WmiObject Win32_Processor | Select-Object -First 1).Name"
-    );
+    let cpu = run_powershell("(Get-WmiObject Win32_Processor | Select-Object -First 1).Name");
     if cpu.is_empty() { "Desconhecido".to_string() } else { cpu }
 }
 
 fn get_ram_gb() -> i64 {
-    let ram_bytes = run_powershell(
-        "(Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory"
-    );
+    let ram_bytes = run_powershell("(Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory");
     let bytes: u64 = ram_bytes.trim().parse().unwrap_or(0);
     (bytes / (1024 * 1024 * 1024)) as i64
 }
 
 fn get_storage() -> (i64, String) {
-    // Pega o disco principal (maior capacidade)
     let size_str = run_powershell(
         "(Get-WmiObject Win32_DiskDrive | Sort-Object Size -Descending | Select-Object -First 1).Size"
     );
     let size_bytes: u64 = size_str.trim().parse().unwrap_or(0);
     let size_gb = (size_bytes / (1024 * 1024 * 1024)) as i64;
 
-    // Detecta tipo de disco
     let media_type = run_powershell(
         "(Get-PhysicalDisk | Sort-Object Size -Descending | Select-Object -First 1).MediaType"
     );
@@ -113,15 +156,10 @@ fn get_storage() -> (i64, String) {
     );
 
     let storage_type = if media_type.contains("SSD") || media_type.contains("4") {
-        if bus_type.contains("NVMe") || bus_type.contains("17") {
-            "SSD_NVME"
-        } else {
-            "SSD_SATA"
-        }
+        if bus_type.contains("NVMe") || bus_type.contains("17") { "SSD_NVME" } else { "SSD_SATA" }
     } else if media_type.contains("HDD") || media_type.contains("3") {
         "HDD"
     } else {
-        // Fallback: se não conseguir detectar, assume SSD
         "SSD_SATA"
     };
 
@@ -136,7 +174,6 @@ fn get_os() -> String {
 }
 
 fn get_windows_username() -> String {
-    // Pega o username do Windows (ex: ricardo.moretti)
     let username = run_powershell("$env:USERNAME");
     if username.is_empty() {
         std::env::var("USERNAME").unwrap_or_default()
@@ -180,19 +217,12 @@ fn coletar_hardware() -> HardwareInfo {
 
     println!("  [8/8] Usuario Windows...");
     let employee_name = get_windows_username();
-    let hostname = get_hostname();
+    let hostname      = get_hostname();
 
     HardwareInfo {
-        service_tag,
-        equipment_type,
-        model,
-        cpu,
-        ram_gb,
-        storage_capacity_gb,
-        storage_type,
-        os,
-        employee_name,
-        hostname,
+        service_tag, equipment_type, model, cpu,
+        ram_gb, storage_capacity_gb, storage_type,
+        os, employee_name, hostname,
     }
 }
 
@@ -214,23 +244,19 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
     let pool = Pool::new(opts)?;
     let mut conn = pool.get_conn()?;
 
-    // Garante que a filial "Pendente" existe
     conn.exec_drop(
         "INSERT IGNORE INTO branches (id, name) VALUES (?, ?)",
         (BRANCH_PENDENTE_ID, BRANCH_PENDENTE_NAME),
     )?;
 
-    // Verifica se a service tag já existe
     let exists: Option<String> = conn.exec_first(
         "SELECT id FROM assets WHERE service_tag = ?",
         (&info.service_tag,),
     )?;
 
     if let Some(existing_id) = exists {
-        println!("\n!! Service Tag '{}' ja existe no banco (ID: {}).", info.service_tag, existing_id);
-        println!("   Atualizando informacoes de hardware...");
+        println!("\n!! Service Tag '{}' ja existe (ID: {}). Atualizando...", info.service_tag, existing_id);
 
-        // Atualiza as informações de hardware do ativo existente
         let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         conn.exec_drop(
             r"UPDATE assets SET
@@ -239,17 +265,11 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
                 updated_at = ?
               WHERE service_tag = ?",
             (
-                &info.cpu,
-                info.ram_gb,
-                info.storage_capacity_gb,
-                &info.storage_type,
-                &info.os,
-                &info.model,
-                &info.equipment_type,
+                &info.cpu, info.ram_gb, info.storage_capacity_gb, &info.storage_type,
+                &info.os, &info.model, &info.equipment_type,
                 &format!("\n[Coletor] Atualizado em {} | Host: {} | User: {}",
                     now, info.hostname, info.employee_name),
-                &now,
-                &info.service_tag,
+                &now, &info.service_tag,
             ),
         )?;
 
@@ -257,20 +277,14 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
     }
 
     // Cria novo ativo
-    let id = uuid::Uuid::new_v4().to_string();
+    let id  = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-
     let notes = format!(
         "[Coletado automaticamente] Host: {} | User: {} | Data: {}",
         info.hostname, info.employee_name, now
     );
-
-    // employee_name vem do username Windows (pode ser vazio em máquinas novas)
-    let employee_name: Option<&str> = if info.employee_name.is_empty() {
-        None
-    } else {
-        Some(&info.employee_name)
-    };
+    let employee_name: Option<&str> =
+        if info.employee_name.is_empty() { None } else { Some(&info.employee_name) };
 
     conn.exec_drop(
         r"INSERT INTO assets (
@@ -285,35 +299,33 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
             :warranty_start, :warranty_end, :created_at, :updated_at
         )",
         params! {
-            "id" => &id,
-            "service_tag" => &info.service_tag,
-            "equipment_type" => &info.equipment_type,
-            "status" => "STOCK",
-            "employee_name" => employee_name,
-            "branch_id" => BRANCH_PENDENTE_ID,
-            "ram_gb" => info.ram_gb,
+            "id"                  => &id,
+            "service_tag"         => &info.service_tag,
+            "equipment_type"      => &info.equipment_type,
+            "status"              => "STOCK",
+            "employee_name"       => employee_name,
+            "branch_id"           => BRANCH_PENDENTE_ID,
+            "ram_gb"              => info.ram_gb,
             "storage_capacity_gb" => info.storage_capacity_gb,
-            "storage_type" => &info.storage_type,
-            "os" => &info.os,
-            "cpu" => &info.cpu,
-            "model" => &info.model,
-            "year" => None::<i64>,
-            "notes" => &notes,
-            "is_training" => 0_i32,
-            "warranty_start" => None::<String>,
-            "warranty_end" => None::<String>,
-            "created_at" => &now,
-            "updated_at" => &now,
+            "storage_type"        => &info.storage_type,
+            "os"                  => &info.os,
+            "cpu"                 => &info.cpu,
+            "model"               => &info.model,
+            "year"                => None::<i64>,
+            "notes"               => &notes,
+            "is_training"         => 0_i32,
+            "warranty_start"      => None::<String>,
+            "warranty_end"        => None::<String>,
+            "created_at"          => &now,
+            "updated_at"          => &now,
         },
     )?;
 
-    // Registra na auditoria
-    let audit_id = uuid::Uuid::new_v4().to_string();
+    let audit_id     = uuid::Uuid::new_v4().to_string();
     let changes_json = format!(
         r#"{{"action":"COLETADO","service_tag":"{}","hostname":"{}","user":"{}"}}"#,
         info.service_tag, info.hostname, info.employee_name
     );
-
     conn.exec_drop(
         "INSERT INTO asset_audit (id, asset_id, changed_at, changes_json) VALUES (?, ?, ?, ?)",
         (&audit_id, &id, &now, &changes_json),
@@ -325,6 +337,10 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
 // ── Main ───────────────────────────────────────────────────────────
 
 fn main() {
+    let mut log = Logger::new();
+
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     println!("╔══════════════════════════════════════════════╗");
     println!("║   AssetAgro Collector v1.0                   ║");
     println!("║   Tracbel Agro — Departamento de TI          ║");
@@ -347,26 +363,41 @@ fn main() {
     println!("│ Usuario:      {:<30}│", info.employee_name);
     println!("│ Hostname:     {:<30}│", info.hostname);
     println!("└─────────────────────────────────────────────┘");
-
     println!();
+
+    // ── Grava entrada no log ───────────────────────────────────────
+    log.separador();
+    log.log_file(&format!("[{}] {} | {}", timestamp, info.hostname, info.employee_name));
+    log.log_file(&format!(
+        "  Hardware : {} | {} | {}GB RAM | {}GB {} | {}",
+        info.model, info.cpu, info.ram_gb,
+        info.storage_capacity_gb, info.storage_type, info.os
+    ));
+    log.log_file(&format!("  Tag      : {} | Tipo: {}", info.service_tag, info.equipment_type));
+    log.log_file(&format!("  Servidor : {}:{}", MYSQL_HOST, MYSQL_PORT));
+
+    // ── Envia para o banco ─────────────────────────────────────────
     match enviar_para_banco(&info) {
         Ok(id) => {
-            println!(">> SUCESSO! Ativo registrado no banco.");
-            println!("   ID: {}", id);
-            println!("   Status: STOCK (Pendente de alocacao)");
-            println!("   Filial: Pendente (definir no AssetAgro)");
+            log.log(">> SUCESSO! Ativo registrado no banco.");
+            log.log(&format!("   ID: {}", id));
+            log.log("   Status: STOCK (Pendente de alocacao)");
+            log.log("   Filial: Pendente (definir no AssetAgro)");
+            log.log_file(&format!("  Resultado: SUCESSO — ID {}", id));
         }
         Err(e) => {
-            println!(">> ERRO ao enviar para o banco:");
-            println!("   {}", e);
-            println!();
-            println!("   Verifique:");
-            println!("   - Se o servidor {} esta acessivel", MYSQL_HOST);
-            println!("   - Se a porta {} esta aberta", MYSQL_PORT);
-            println!("   - Se as credenciais estao corretas");
+            log.log(">> ERRO ao enviar para o banco:");
+            log.log(&format!("   {}", e));
+            log.log("");
+            log.log(&format!("   Verifique se o servidor {} esta acessivel na porta {}", MYSQL_HOST, MYSQL_PORT));
+            log.log_file(&format!("  Resultado: ERRO — {}", e));
         }
     }
 
+    log.log_file(&format!("  Log salvo em: {}", log_path().display()));
+
+    println!();
+    println!("Log salvo em: {}", log_path().display());
     println!();
     println!("Pressione ENTER para fechar...");
     let mut _input = String::new();

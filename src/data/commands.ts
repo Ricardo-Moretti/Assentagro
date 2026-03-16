@@ -29,6 +29,10 @@ import type {
   LoginDto,
   CreateUserDto,
   ChangePasswordDto,
+  AssetLoan,
+  CreateLoanDto,
+  Nota,
+  CreateNotaDto,
 } from '@/domain/models';
 
 // Filiais
@@ -229,3 +233,43 @@ export const escreverArquivo = (caminho: string, dados: number[]): Promise<void>
 // Verificação de conexão
 export const verificarConexao = (): Promise<boolean> =>
   invoke('verificar_conexao');
+
+// Empréstimos
+export const criarEmprestimo = (dados: CreateLoanDto): Promise<AssetLoan> =>
+  invoke('criar_emprestimo', { dados });
+
+export const devolverEmprestimo = (
+  id: string,
+  observacoes?: string,
+): Promise<AssetLoan> =>
+  invoke('devolver_emprestimo', { id, observacoes: observacoes ?? null });
+
+export const listarEmprestimos = (
+  status_filter?: string,
+  asset_id?: string,
+): Promise<AssetLoan[]> =>
+  invoke('listar_emprestimos', {
+    status_filter: status_filter ?? null,
+    asset_id: asset_id ?? null,
+  });
+
+export const excluirEmprestimo = (id: string): Promise<void> =>
+  invoke('excluir_emprestimo', { id });
+
+// Observações
+export const listarNotas = (categoria?: string): Promise<Nota[]> =>
+  invoke('listar_notas', { categoria: categoria ?? null });
+
+export const criarNota = (dados: CreateNotaDto): Promise<Nota> =>
+  invoke('criar_nota', { dados });
+
+export const atualizarNota = (
+  id: string,
+  titulo: string,
+  corpo: string,
+  categoria: string,
+): Promise<Nota> =>
+  invoke('atualizar_nota', { id, titulo, corpo, categoria });
+
+export const excluirNota = (id: string): Promise<void> =>
+  invoke('excluir_nota', { id });

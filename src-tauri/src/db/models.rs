@@ -309,3 +309,66 @@ pub struct ChangePasswordDto {
     pub user_id: String,
     pub new_password: String,
 }
+
+// ============================================================
+// Empréstimos / Retiradas
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetLoan {
+    pub id: String,
+    pub asset_id: String,
+    pub tipo: String,          // EMPRESTIMO | MANUTENCAO
+    pub responsavel: String,
+    pub contato: Option<String>,
+    pub destino: String,
+    pub destino_branch_id: Option<String>,
+    pub data_saida: String,
+    pub previsao_retorno: Option<String>,
+    pub data_retorno: Option<String>,
+    pub status: String,        // ATIVO | DEVOLVIDO | ATRASADO
+    pub observacoes: String,
+    pub registrado_por: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    // joined
+    pub service_tag: Option<String>,
+    pub asset_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateLoanDto {
+    pub asset_id: String,
+    pub tipo: String,
+    pub responsavel: String,
+    pub contato: Option<String>,
+    pub destino: String,
+    pub destino_branch_id: Option<String>,
+    pub data_saida: String,
+    pub previsao_retorno: Option<String>,
+    pub observacoes: Option<String>,
+    pub registrado_por: Option<String>,
+}
+
+// ============================================================
+// Observações
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Nota {
+    pub id: String,
+    pub titulo: String,
+    pub corpo: String,
+    pub categoria: String,  // GERAL | TI | REUNIAO | ALERTA | OUTRO
+    pub autor: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateNotaDto {
+    pub titulo: String,
+    pub corpo: String,
+    pub categoria: String,
+    pub autor: String,
+}

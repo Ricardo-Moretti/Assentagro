@@ -19,6 +19,8 @@ const VIEW_TITLES: Record<AppView, string> = {
   movements: 'Movimentações',
   audit: 'Auditoria',
   training: 'Notebooks de Treinamento',
+  loans: 'Empréstimos e Retiradas',
+  notes: 'Observações',
   users: 'Gerenciar Usuários',
   settings: 'Configurações',
   help: 'Ajuda',

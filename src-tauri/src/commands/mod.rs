@@ -75,7 +75,7 @@ pub fn excluir_ativo(state: State<'_, AppState>, id: String) -> Result<(), Strin
 // Dashboard
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn obter_dados_dashboard(
     state: State<'_, AppState>,
     branch_id: Option<String>,
@@ -88,7 +88,7 @@ pub fn obter_dados_dashboard(
 // Exportação
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn listar_ativos_para_exportacao(
     state: State<'_, AppState>,
     branch_ids: Option<Vec<String>>,
@@ -101,7 +101,7 @@ pub fn listar_ativos_para_exportacao(
 // Auditoria
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn listar_auditoria(
     state: State<'_, AppState>,
     asset_id: Option<String>,
@@ -224,7 +224,7 @@ pub fn obter_configuracao(
 // Movimentações por ativo
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn listar_movimentos_por_ativo(
     state: State<'_, AppState>,
     asset_id: String,
@@ -237,7 +237,7 @@ pub fn listar_movimentos_por_ativo(
 // Colaboradores
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn listar_colaboradores(
     state: State<'_, AppState>,
     search: Option<String>,
@@ -247,7 +247,7 @@ pub fn listar_colaboradores(
     queries::listar_colaboradores(&mut conn, search.as_deref(), branch_id.as_deref(), true).map_err(err)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn criar_colaborador(
     state: State<'_, AppState>,
     name: String,
@@ -279,7 +279,7 @@ pub fn retornar_de_manutencao(
     queries::retornar_de_manutencao(&mut conn, &dados).map_err(err)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn listar_manutencoes(
     state: State<'_, AppState>,
     status_filter: Option<String>,
@@ -292,7 +292,7 @@ pub fn listar_manutencoes(
 // Operações em lote
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn devolver_em_lote(
     state: State<'_, AppState>,
     asset_ids: Vec<String>,
@@ -302,7 +302,7 @@ pub fn devolver_em_lote(
     queries::devolver_em_lote(&mut conn, &asset_ids, &reason).map_err(err)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn baixar_em_lote(
     state: State<'_, AppState>,
     asset_ids: Vec<String>,
@@ -332,7 +332,7 @@ pub fn listar_notebooks_treinamento(state: State<'_, AppState>) -> Result<Vec<As
     queries::listar_notebooks_treinamento(&mut conn).map_err(err)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn marcar_como_treinamento(
     state: State<'_, AppState>,
     asset_id: String,
@@ -346,7 +346,7 @@ pub fn marcar_como_treinamento(
 // Validação de Service Tag
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn verificar_service_tag(
     state: State<'_, AppState>,
     tag: String,
@@ -373,7 +373,7 @@ pub fn listar_alertas_garantia(
 // Anexos (fotos/documentos)
 // ============================================================
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn criar_anexo(
     state: State<'_, AppState>,
     asset_id: String,
@@ -403,7 +403,7 @@ pub fn criar_anexo(
     queries::criar_anexo(&mut conn, &asset_id, filename, dest_path.to_str().unwrap_or(""), file_type).map_err(err)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn listar_anexos(
     state: State<'_, AppState>,
     asset_id: String,
@@ -504,4 +504,83 @@ pub fn escrever_arquivo(caminho: String, dados: Vec<u8>) -> Result<(), String> {
 pub fn verificar_conexao(state: State<'_, AppState>) -> Result<bool, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::verificar_conexao(&mut conn)
+}
+
+// ============================================================
+// Empréstimos / Retiradas
+// ============================================================
+
+#[tauri::command]
+pub fn criar_emprestimo(
+    state: State<'_, AppState>,
+    dados: CreateLoanDto,
+) -> Result<AssetLoan, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::criar_emprestimo(&mut conn, &dados).map_err(err)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn devolver_emprestimo(
+    state: State<'_, AppState>,
+    id: String,
+    observacoes: Option<String>,
+) -> Result<AssetLoan, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::devolver_emprestimo(&mut conn, &id, observacoes.as_deref()).map_err(err)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn listar_emprestimos(
+    state: State<'_, AppState>,
+    status_filter: Option<String>,
+    asset_id: Option<String>,
+) -> Result<Vec<AssetLoan>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_emprestimos(&mut conn, status_filter.as_deref(), asset_id.as_deref()).map_err(err)
+}
+
+#[tauri::command]
+pub fn excluir_emprestimo(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::excluir_emprestimo(&mut conn, &id).map_err(err)
+}
+
+// ============================================================
+// Observações / Notas
+// ============================================================
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn listar_notas(
+    state: State<'_, AppState>,
+    categoria: Option<String>,
+) -> Result<Vec<Nota>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_notas(&mut conn, categoria.as_deref()).map_err(err)
+}
+
+#[tauri::command]
+pub fn criar_nota(
+    state: State<'_, AppState>,
+    dados: CreateNotaDto,
+) -> Result<Nota, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::criar_nota(&mut conn, &dados).map_err(err)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn atualizar_nota(
+    state: State<'_, AppState>,
+    id: String,
+    titulo: String,
+    corpo: String,
+    categoria: String,
+) -> Result<Nota, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::atualizar_nota(&mut conn, &id, &titulo, &corpo, &categoria).map_err(err)
+}
+
+#[tauri::command]
+pub fn excluir_nota(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::excluir_nota(&mut conn, &id).map_err(err)
 }

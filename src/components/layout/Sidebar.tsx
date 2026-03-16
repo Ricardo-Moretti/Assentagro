@@ -7,8 +7,10 @@ import {
   FileDown,
   FileUp,
   ArrowLeftRight,
+  ArrowRightLeft,
   ClipboardList,
   GraduationCap,
+  StickyNote,
   Users,
   Settings,
   HelpCircle,
@@ -35,6 +37,8 @@ const navItems: NavItem[] = [
   { view: 'movements', label: 'Movimentações', icon: <ArrowLeftRight className="h-5 w-5" /> },
   { view: 'audit', label: 'Auditoria', icon: <ClipboardList className="h-5 w-5" /> },
   { view: 'training', label: 'Treinamento', icon: <GraduationCap className="h-5 w-5" /> },
+  { view: 'loans', label: 'Empréstimos', icon: <ArrowRightLeft className="h-5 w-5" /> },
+  { view: 'notes', label: 'Observações', icon: <StickyNote className="h-5 w-5" /> },
   { view: 'users', label: 'Usuários', icon: <Users className="h-5 w-5" /> },
 ];
 

@@ -21,6 +21,8 @@ export type AppView =
   | 'movements'
   | 'audit'
   | 'training'
+  | 'loans'
+  | 'notes'
   | 'users'
   | 'settings'
   | 'help';
@@ -269,4 +271,62 @@ export interface CreateUserDto {
 export interface ChangePasswordDto {
   user_id: string;
   new_password: string;
+}
+
+// Empréstimos / Retiradas
+export type LoanTipo = 'EMPRESTIMO' | 'MANUTENCAO';
+export type LoanStatus = 'ATIVO' | 'DEVOLVIDO' | 'ATRASADO';
+
+export interface AssetLoan {
+  id: string;
+  asset_id: string;
+  tipo: LoanTipo;
+  responsavel: string;
+  contato: string | null;
+  destino: string;
+  destino_branch_id: string | null;
+  data_saida: string;
+  previsao_retorno: string | null;
+  data_retorno: string | null;
+  status: LoanStatus;
+  observacoes: string;
+  registrado_por: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  service_tag: string | null;
+  asset_model: string | null;
+}
+
+export interface CreateLoanDto {
+  asset_id: string;
+  tipo: LoanTipo;
+  responsavel: string;
+  contato?: string;
+  destino: string;
+  destino_branch_id?: string;
+  data_saida: string;
+  previsao_retorno?: string;
+  observacoes?: string;
+  registrado_por?: string;
+}
+
+// Observações
+export type NotaCategoria = 'GERAL' | 'TI' | 'REUNIAO' | 'ALERTA' | 'OUTRO';
+
+export interface Nota {
+  id: string;
+  titulo: string;
+  corpo: string;
+  categoria: NotaCategoria;
+  autor: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateNotaDto {
+  titulo: string;
+  corpo: string;
+  categoria: NotaCategoria;
+  autor: string;
 }

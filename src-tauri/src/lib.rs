@@ -139,6 +139,16 @@ pub fn run() {
             commands::escrever_arquivo,
             // Verificação de conexão
             commands::verificar_conexao,
+            // Empréstimos / Retiradas
+            commands::criar_emprestimo,
+            commands::devolver_emprestimo,
+            commands::listar_emprestimos,
+            commands::excluir_emprestimo,
+            // Observações / Notas
+            commands::listar_notas,
+            commands::criar_nota,
+            commands::atualizar_nota,
+            commands::excluir_nota,
         ])
         .run(tauri::generate_context!())
         .expect("Erro ao executar AssetAgro");

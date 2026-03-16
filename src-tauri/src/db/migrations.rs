@@ -187,6 +187,53 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
         info!("Migrações MySQL concluídas.");
     }
 
+    // Migration 010 — Empréstimos e Observações
+    if versao_atual < 10 {
+        info!("Executando migração 010: asset_loans + notes...");
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS asset_loans (
+                id                VARCHAR(36)  NOT NULL PRIMARY KEY,
+                asset_id          VARCHAR(36)  NOT NULL,
+                tipo              VARCHAR(20)  NOT NULL DEFAULT 'EMPRESTIMO',
+                responsavel       VARCHAR(255) NOT NULL,
+                contato           VARCHAR(255) NULL,
+                destino           VARCHAR(255) NOT NULL DEFAULT '',
+                destino_branch_id VARCHAR(36)  NULL,
+                data_saida        VARCHAR(30)  NOT NULL,
+                previsao_retorno  VARCHAR(30)  NULL,
+                data_retorno      VARCHAR(30)  NULL,
+                status            VARCHAR(20)  NOT NULL DEFAULT 'ATIVO',
+                observacoes       TEXT         NOT NULL DEFAULT '',
+                registrado_por    VARCHAR(255) NULL,
+                created_at        VARCHAR(30)  NOT NULL,
+                updated_at        VARCHAR(30)  NOT NULL,
+                KEY idx_loans_asset  (asset_id),
+                KEY idx_loans_status (status),
+                KEY idx_loans_tipo   (tipo),
+                CONSTRAINT fk_loans_asset FOREIGN KEY (asset_id)
+                    REFERENCES assets(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS notes (
+                id         VARCHAR(36)  NOT NULL PRIMARY KEY,
+                titulo     VARCHAR(255) NOT NULL DEFAULT '',
+                corpo      TEXT         NOT NULL,
+                categoria  VARCHAR(50)  NOT NULL DEFAULT 'GERAL',
+                autor      VARCHAR(255) NOT NULL DEFAULT '',
+                created_at VARCHAR(30)  NOT NULL,
+                updated_at VARCHAR(30)  NOT NULL,
+                KEY idx_notes_categoria  (categoria),
+                KEY idx_notes_created_at (created_at)
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (10)")?;
+        info!("Migração 010 concluída.");
+    }
+
     // Seed default admin user
     seed_admin_user(conn)?;
 
