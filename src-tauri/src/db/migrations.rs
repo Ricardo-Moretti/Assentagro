@@ -204,7 +204,7 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
                 previsao_retorno  VARCHAR(30)  NULL,
                 data_retorno      VARCHAR(30)  NULL,
                 status            VARCHAR(20)  NOT NULL DEFAULT 'ATIVO',
-                observacoes       TEXT         NOT NULL DEFAULT '',
+                observacoes       TEXT         NULL,
                 registrado_por    VARCHAR(255) NULL,
                 created_at        VARCHAR(30)  NOT NULL,
                 updated_at        VARCHAR(30)  NOT NULL,

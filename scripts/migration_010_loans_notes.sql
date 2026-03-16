@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS asset_loans (
                         COMMENT 'Data real de retorno (NULL = ainda fora)',
     status            VARCHAR(20)  NOT NULL DEFAULT 'ATIVO'
                         COMMENT 'ATIVO | DEVOLVIDO | ATRASADO',
-    observacoes       TEXT         NOT NULL DEFAULT ''
+    observacoes       TEXT         NULL
                         COMMENT 'Observações livres',
     registrado_por    VARCHAR(255) NULL
                         COMMENT 'Usuário do sistema que registrou',

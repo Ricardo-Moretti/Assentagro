@@ -1890,7 +1890,7 @@ fn row_to_loan(row: mysql::Row) -> AssetLoan {
         previsao_retorno:  row.get(8),
         data_retorno:      row.get(9),
         status:            row.get(10).unwrap_or_default(),
-        observacoes:       row.get::<Option<String>, _>(11).unwrap_or_default().unwrap_or_default(),
+        observacoes:       row.get::<Option<String>, _>(11).unwrap_or_default().unwrap_or_else(|| String::new()),
         registrado_por:    row.get(12),
         created_at:        row.get(13).unwrap_or_default(),
         updated_at:        row.get(14).unwrap_or_default(),
