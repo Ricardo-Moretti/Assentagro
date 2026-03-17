@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, User, Eye, EyeOff, Loader2, Tractor, Shield } from 'lucide-react';
+import { getVersion } from '@tauri-apps/api/app';
 import { autenticarUsuario } from '@/data/commands';
 import { useAuthStore } from '@/stores/useAuthStore';
 import loginBg from '@/assets/image_login.jpg';
@@ -8,6 +9,11 @@ import loginBg from '@/assets/image_login.jpg';
 export const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,7 +68,7 @@ export const LoginPage: React.FC = () => {
               <Shield className="h-3.5 w-3.5" />
               <span>Conexão Segura</span>
             </div>
-            <span className="text-xs text-white/30">v0.6.0</span>
+            <span className="text-xs text-white/30">v{appVersion}</span>
           </div>
         </div>
       </div>
@@ -172,7 +178,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-400 text-center mt-6">
-            AssetAgro v0.6.0 — Tracbel Agro
+            AssetAgro v{appVersion} — Tracbel Agro
           </p>
         </motion.div>
       </div>

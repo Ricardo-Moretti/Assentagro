@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Monitor, Download, Upload, Loader2, Clock } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
+import { getVersion } from '@tauri-apps/api/app';
 import { cn } from '@/lib/utils';
 import { useThemeStore } from '@/stores/useThemeStore';
 import { useToast } from '@/components/ui/Toast';
@@ -21,10 +22,12 @@ export const SettingsPage: React.FC = () => {
   const [restoring, setRestoring] = useState(false);
   const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
   const [lastAccess, setLastAccess] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState('...');
 
   useEffect(() => {
     obterConfiguracao('last_auto_backup').then(setLastAutoBackup).catch(() => {});
     obterConfiguracao('last_access').then(setLastAccess).catch(() => {});
+    getVersion().then(setAppVersion).catch(() => {});
   }, []);
 
   const handleBackup = async () => {
@@ -153,7 +156,7 @@ export const SettingsPage: React.FC = () => {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Versão</p>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">0.6.0</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{appVersion}</p>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Banco de Dados</p>
