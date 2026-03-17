@@ -155,6 +155,7 @@ export const MovementsPage: React.FC = () => {
         {activeTab === 'reassign' && (
           <ReassignForm
             inUseAssets={inUseAssets}
+            stockAssets={stockAssets}
             onSubmit={handleReassign}
             loading={submitting}
           />
@@ -169,6 +170,7 @@ export const MovementsPage: React.FC = () => {
         {activeTab === 'swap' && (
           <SwapForm
             inUseAssets={inUseAssets}
+            stockAssets={stockAssets}
             onSubmit={handleSwap}
             loading={submitting}
           />

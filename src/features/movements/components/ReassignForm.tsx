@@ -8,17 +8,19 @@ import type { Asset } from '@/domain/models';
 
 interface ReassignFormProps {
   inUseAssets: Asset[];
+  stockAssets: Asset[];
   onSubmit: (assetId: string, toEmployee: string, reason: string) => Promise<void>;
   loading: boolean;
 }
 
-export const ReassignForm: React.FC<ReassignFormProps> = ({ inUseAssets, onSubmit, loading }) => {
+export const ReassignForm: React.FC<ReassignFormProps> = ({ inUseAssets, stockAssets, onSubmit, loading }) => {
   const [assetId, setAssetId] = useState('');
   const [toEmployee, setToEmployee] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
-  const selectedAsset = inUseAssets.find((a) => a.id === assetId);
+  const allAssets = [...inUseAssets, ...stockAssets];
+  const selectedAsset = allAssets.find((a) => a.id === assetId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,14 +46,14 @@ export const ReassignForm: React.FC<ReassignFormProps> = ({ inUseAssets, onSubmi
       </p>
 
       <Select
-        label="Equipamento (Em Uso) *"
+        label="Equipamento *"
         value={assetId}
         onChange={(e) => setAssetId(e.target.value)}
-        options={inUseAssets.map((a) => ({
+        options={allAssets.map((a) => ({
           value: a.id,
-          label: `${a.service_tag} — ${a.employee_name ?? '—'} (${a.branch_name ?? 'Sem filial'})`,
+          label: `${a.service_tag} — ${a.employee_name ?? 'Estoque'} (${a.branch_name ?? 'Sem filial'}) [${a.status === 'IN_USE' ? 'Em Uso' : 'Estoque'}]`,
         }))}
-        placeholder={inUseAssets.length === 0 ? 'Nenhum equipamento em uso' : 'Selecione...'}
+        placeholder={allAssets.length === 0 ? 'Nenhum equipamento disponível' : 'Selecione...'}
       />
 
       {selectedAsset && (
@@ -86,7 +88,7 @@ export const ReassignForm: React.FC<ReassignFormProps> = ({ inUseAssets, onSubmi
         type="submit"
         loading={loading}
         icon={<UserCheck className="h-4 w-4" />}
-        disabled={inUseAssets.length === 0}
+        disabled={allAssets.length === 0}
       >
         Reatribuir Equipamento
       </Button>

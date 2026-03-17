@@ -781,9 +781,9 @@ pub fn atribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<Mo
 pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<Movement> {
     let asset = obter_ativo(conn, &dto.asset_id)?;
 
-    if asset.status != "IN_USE" {
+    if asset.status != "IN_USE" && asset.status != "STOCK" {
         return Err(anyhow!(
-            "Equipamento {} não está em uso (status atual: {}). Use a atribuição normal.",
+            "Equipamento {} não pode ser reatribuído (status atual: {}).",
             asset.service_tag,
             asset.status
         ));
@@ -792,19 +792,20 @@ pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let mov_id = Uuid::new_v4().to_string();
     let from_employee = asset.employee_name.clone();
+    let from_status = asset.status.clone();
 
-    // Atualiza o ativo — mantém IN_USE, troca colaborador
+    // Atualiza o ativo — muda para IN_USE, atribui colaborador
     conn.exec_drop(
-        "UPDATE assets SET employee_name = ?, updated_at = ? WHERE id = ?",
+        "UPDATE assets SET employee_name = ?, status = 'IN_USE', updated_at = ? WHERE id = ?",
         (&dto.to_employee, &now, &dto.asset_id),
     )
     .context("Falha ao atualizar ativo na reatribuição")?;
 
-    // Registra movimentação (tipo ASSIGN, from->to employee)
+    // Registra movimentação
     conn.exec_drop(
         "INSERT INTO asset_movements (id, asset_id, movement_type, from_employee, to_employee, from_status, to_status, reason, created_at)
-         VALUES (?, ?, 'ASSIGN', ?, ?, 'IN_USE', 'IN_USE', ?, ?)",
-        (&mov_id, &dto.asset_id, &from_employee, &dto.to_employee, &dto.reason, &now),
+         VALUES (?, ?, 'ASSIGN', ?, ?, ?, 'IN_USE', ?, ?)",
+        (&mov_id, &dto.asset_id, &from_employee, &dto.to_employee, &from_status, &dto.reason, &now),
     )
     .context("Falha ao registrar movimentação de reatribuição")?;
 
@@ -812,6 +813,7 @@ pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<
     let changes = serde_json::json!({
         "movement": "REASSIGN",
         "employee_name": { "from": from_employee, "to": dto.to_employee },
+        "status": { "from": from_status, "to": "IN_USE" },
         "reason": dto.reason,
     });
     registrar_auditoria(conn, &dto.asset_id, &changes)?;
@@ -823,7 +825,7 @@ pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<
         movement_type: "ASSIGN".to_string(),
         from_employee,
         to_employee: Some(dto.to_employee.clone()),
-        from_status: "IN_USE".to_string(),
+        from_status,
         to_status: "IN_USE".to_string(),
         reason: dto.reason.clone(),
         created_at: now,
@@ -889,16 +891,16 @@ pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<M
     let asset_a = obter_ativo(conn, &dto.asset_id_a)?;
     let asset_b = obter_ativo(conn, &dto.asset_id_b)?;
 
-    if asset_a.status != "IN_USE" {
+    if asset_a.status != "IN_USE" && asset_a.status != "STOCK" {
         return Err(anyhow!(
-            "Equipamento {} não está em uso (status: {})",
+            "Equipamento {} não pode ser trocado (status: {})",
             asset_a.service_tag,
             asset_a.status
         ));
     }
-    if asset_b.status != "IN_USE" {
+    if asset_b.status != "IN_USE" && asset_b.status != "STOCK" {
         return Err(anyhow!(
-            "Equipamento {} não está em uso (status: {})",
+            "Equipamento {} não pode ser trocado (status: {})",
             asset_b.service_tag,
             asset_b.status
         ));
@@ -906,36 +908,41 @@ pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<M
 
     let emp_a = asset_a.employee_name.clone().unwrap_or_default();
     let emp_b = asset_b.employee_name.clone().unwrap_or_default();
+    let status_a = asset_a.status.clone();
+    let status_b = asset_b.status.clone();
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let mov_id_a = Uuid::new_v4().to_string();
     let mov_id_b = Uuid::new_v4().to_string();
 
-    // Swap: A recebe employee de B, B recebe employee de A
+    // Swap: A recebe employee/status de B, B recebe employee/status de A
+    let new_status_a = &status_b;
+    let new_status_b = &status_a;
+
     conn.exec_drop(
-        "UPDATE assets SET employee_name = ?, updated_at = ? WHERE id = ?",
-        (&emp_b, &now, &dto.asset_id_a),
+        "UPDATE assets SET employee_name = ?, status = ?, updated_at = ? WHERE id = ?",
+        (&emp_b, new_status_a, &now, &dto.asset_id_a),
     )
     .context("Falha ao atualizar ativo A na troca")?;
 
     conn.exec_drop(
-        "UPDATE assets SET employee_name = ?, updated_at = ? WHERE id = ?",
-        (&emp_a, &now, &dto.asset_id_b),
+        "UPDATE assets SET employee_name = ?, status = ?, updated_at = ? WHERE id = ?",
+        (&emp_a, new_status_b, &now, &dto.asset_id_b),
     )
     .context("Falha ao atualizar ativo B na troca")?;
 
     // Registra movimentação para ativo A
     conn.exec_drop(
         "INSERT INTO asset_movements (id, asset_id, movement_type, from_employee, to_employee, from_status, to_status, reason, created_at)
-         VALUES (?, ?, 'SWAP', ?, ?, 'IN_USE', 'IN_USE', ?, ?)",
-        (&mov_id_a, &dto.asset_id_a, &emp_a, &emp_b, &dto.reason, &now),
+         VALUES (?, ?, 'SWAP', ?, ?, ?, ?, ?, ?)",
+        (&mov_id_a, &dto.asset_id_a, &emp_a, &emp_b, &status_a, new_status_a, &dto.reason, &now),
     )
     .context("Falha ao registrar movimentação de troca (A)")?;
 
     // Registra movimentação para ativo B
     conn.exec_drop(
         "INSERT INTO asset_movements (id, asset_id, movement_type, from_employee, to_employee, from_status, to_status, reason, created_at)
-         VALUES (?, ?, 'SWAP', ?, ?, 'IN_USE', 'IN_USE', ?, ?)",
-        (&mov_id_b, &dto.asset_id_b, &emp_b, &emp_a, &dto.reason, &now),
+         VALUES (?, ?, 'SWAP', ?, ?, ?, ?, ?, ?)",
+        (&mov_id_b, &dto.asset_id_b, &emp_b, &emp_a, &status_b, new_status_b, &dto.reason, &now),
     )
     .context("Falha ao registrar movimentação de troca (B)")?;
 
@@ -965,8 +972,8 @@ pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<M
             movement_type: "SWAP".to_string(),
             from_employee: Some(emp_a.clone()),
             to_employee: Some(emp_b.clone()),
-            from_status: "IN_USE".to_string(),
-            to_status: "IN_USE".to_string(),
+            from_status: status_a.clone(),
+            to_status: new_status_a.clone(),
             reason: dto.reason.clone(),
             created_at: now.clone(),
         },
@@ -977,8 +984,8 @@ pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<M
             movement_type: "SWAP".to_string(),
             from_employee: Some(emp_b),
             to_employee: Some(emp_a),
-            from_status: "IN_USE".to_string(),
-            to_status: "IN_USE".to_string(),
+            from_status: status_b.clone(),
+            to_status: new_status_b.clone(),
             reason: dto.reason.clone(),
             created_at: now,
         },

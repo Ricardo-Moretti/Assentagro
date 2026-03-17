@@ -7,6 +7,7 @@ import type { Asset } from '@/domain/models';
 
 interface SwapFormProps {
   inUseAssets: Asset[];
+  stockAssets: Asset[];
   onSubmit: (assetIdA: string, assetIdB: string, reason: string) => Promise<void>;
   loading: boolean;
 }
@@ -36,18 +37,19 @@ const AssetInfoCard: React.FC<{ asset: Asset; side: string }> = ({ asset, side }
   </div>
 );
 
-export const SwapForm: React.FC<SwapFormProps> = ({ inUseAssets, onSubmit, loading }) => {
+export const SwapForm: React.FC<SwapFormProps> = ({ inUseAssets, stockAssets, onSubmit, loading }) => {
   const [assetIdA, setAssetIdA] = useState('');
   const [assetIdB, setAssetIdB] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
-  const assetA = inUseAssets.find((a) => a.id === assetIdA);
-  const assetB = inUseAssets.find((a) => a.id === assetIdB);
+  const allAssets = [...inUseAssets, ...stockAssets];
+  const assetA = allAssets.find((a) => a.id === assetIdA);
+  const assetB = allAssets.find((a) => a.id === assetIdB);
 
   // Filtrar para não selecionar o mesmo equipamento
-  const optionsA = inUseAssets.filter((a) => a.id !== assetIdB);
-  const optionsB = inUseAssets.filter((a) => a.id !== assetIdA);
+  const optionsA = allAssets.filter((a) => a.id !== assetIdB);
+  const optionsB = allAssets.filter((a) => a.id !== assetIdA);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,9 +82,9 @@ export const SwapForm: React.FC<SwapFormProps> = ({ inUseAssets, onSubmit, loadi
             onChange={(e) => setAssetIdA(e.target.value)}
             options={optionsA.map((a) => ({
               value: a.id,
-              label: `${a.service_tag} — ${a.employee_name ?? '?'} (${a.branch_name ?? ''})`,
+              label: `${a.service_tag} — ${a.employee_name ?? 'Estoque'} (${a.branch_name ?? ''}) [${a.status === 'IN_USE' ? 'Em Uso' : 'Estoque'}]`,
             }))}
-            placeholder={inUseAssets.length < 2 ? 'Mínimo 2 em uso' : 'Selecione...'}
+            placeholder={allAssets.length < 2 ? 'Mínimo 2 equipamentos' : 'Selecione...'}
           />
           {assetA && <AssetInfoCard asset={assetA} side="Lado A" />}
         </div>
@@ -94,9 +96,9 @@ export const SwapForm: React.FC<SwapFormProps> = ({ inUseAssets, onSubmit, loadi
             onChange={(e) => setAssetIdB(e.target.value)}
             options={optionsB.map((a) => ({
               value: a.id,
-              label: `${a.service_tag} — ${a.employee_name ?? '?'} (${a.branch_name ?? ''})`,
+              label: `${a.service_tag} — ${a.employee_name ?? 'Estoque'} (${a.branch_name ?? ''}) [${a.status === 'IN_USE' ? 'Em Uso' : 'Estoque'}]`,
             }))}
-            placeholder={inUseAssets.length < 2 ? 'Mínimo 2 em uso' : 'Selecione...'}
+            placeholder={allAssets.length < 2 ? 'Mínimo 2 equipamentos' : 'Selecione...'}
           />
           {assetB && <AssetInfoCard asset={assetB} side="Lado B" />}
         </div>
@@ -152,7 +154,7 @@ export const SwapForm: React.FC<SwapFormProps> = ({ inUseAssets, onSubmit, loadi
         type="submit"
         loading={loading}
         icon={<ArrowLeftRight className="h-4 w-4" />}
-        disabled={inUseAssets.length < 2}
+        disabled={allAssets.length < 2}
       >
         Confirmar Troca
       </Button>
