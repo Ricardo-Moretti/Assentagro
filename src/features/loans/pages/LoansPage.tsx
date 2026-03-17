@@ -44,6 +44,7 @@ function isAtrasado(loan: AssetLoan): boolean {
 export const LoansPage: React.FC = () => {
   const [loans, setLoans] = useState<AssetLoan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('ATIVO');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -51,11 +52,12 @@ export const LoansPage: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await listarEmprestimos(statusFilter || undefined);
       setLoans(data);
-    } catch {
-      // erro silencioso — evita loop de re-render
+    } catch (e) {
+      setLoadError(String(e));
     } finally {
       setLoading(false);
     }
@@ -151,6 +153,18 @@ export const LoansPage: React.FC = () => {
       {/* Lista */}
       {loading ? (
         <LoadingState />
+      ) : loadError ? (
+        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-2xl p-8 text-center space-y-3">
+          <p className="text-red-700 dark:text-red-400 font-medium">Erro ao carregar empréstimos</p>
+          <p className="text-sm text-red-500 dark:text-red-500 font-mono">{loadError}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="mt-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 transition-colors"
+          >
+            Tentar novamente
+          </button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center">
           <ArrowRightLeft className="h-12 w-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />

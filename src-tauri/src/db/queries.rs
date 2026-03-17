@@ -1884,25 +1884,34 @@ pub fn verificar_conexao(conn: &mut PooledConn) -> Result<bool, String> {
 // Empréstimos / Retiradas
 // ============================================================
 
+// Extrai String de forma segura — row.get::<String> entra em pânico se o valor for NULL,
+// então usamos Option<String> em todos os campos para evitar crash.
+fn gs(row: &mysql::Row, idx: usize) -> String {
+    row.get::<Option<String>, _>(idx).flatten().unwrap_or_default()
+}
+fn go(row: &mysql::Row, idx: usize) -> Option<String> {
+    row.get::<Option<String>, _>(idx).flatten()
+}
+
 fn row_to_loan(row: mysql::Row) -> AssetLoan {
     AssetLoan {
-        id:                row.get(0).unwrap_or_default(),
-        asset_id:          row.get(1).unwrap_or_default(),
-        tipo:              row.get(2).unwrap_or_default(),
-        responsavel:       row.get(3).unwrap_or_default(),
-        contato:           row.get(4),
-        destino:           row.get(5).unwrap_or_default(),
-        destino_branch_id: row.get(6),
-        data_saida:        row.get(7).unwrap_or_default(),
-        previsao_retorno:  row.get(8),
-        data_retorno:      row.get(9),
-        status:            row.get(10).unwrap_or_default(),
-        observacoes:       row.get::<Option<String>, _>(11).unwrap_or_default().unwrap_or_else(|| String::new()),
-        registrado_por:    row.get(12),
-        created_at:        row.get(13).unwrap_or_default(),
-        updated_at:        row.get(14).unwrap_or_default(),
-        service_tag:       row.get(15),
-        asset_model:       row.get(16),
+        id:                gs(&row, 0),
+        asset_id:          gs(&row, 1),
+        tipo:              gs(&row, 2),
+        responsavel:       gs(&row, 3),
+        contato:           go(&row, 4),
+        destino:           gs(&row, 5),
+        destino_branch_id: go(&row, 6),
+        data_saida:        gs(&row, 7),
+        previsao_retorno:  go(&row, 8),
+        data_retorno:      go(&row, 9),
+        status:            gs(&row, 10),
+        observacoes:       gs(&row, 11),
+        registrado_por:    go(&row, 12),
+        created_at:        gs(&row, 13),
+        updated_at:        gs(&row, 14),
+        service_tag:       go(&row, 15),
+        asset_model:       go(&row, 16),
     }
 }
 
@@ -1916,6 +1925,16 @@ const LOAN_SELECT: &str = "
     LEFT JOIN assets a ON l.asset_id = a.id";
 
 pub fn criar_emprestimo(conn: &mut PooledConn, dto: &CreateLoanDto) -> Result<AssetLoan> {
+    // Verificar se já existe empréstimo ATIVO para este ativo
+    let count: u64 = conn.exec_first(
+        "SELECT COUNT(*) FROM asset_loans WHERE asset_id = ? AND status = 'ATIVO'",
+        (&dto.asset_id,),
+    )?.unwrap_or(0);
+
+    if count > 0 {
+        return Err(anyhow!("Este equipamento já possui um empréstimo ativo. Registre a devolução antes de criar um novo."));
+    }
+
     let id  = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
