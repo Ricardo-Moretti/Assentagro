@@ -45,7 +45,7 @@
       "requireLiteralLeadingDot": false
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlCNUNCQkNGMzEzNUI4MDAKUldRQXVEVXh6N3RjbXdKM0I5d3dTaVpUbXVKS3d1WEllQlZBTE5uOThodEV4OUVSVkFEV2w1UzYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM1NTkyMTYzNjMyNTUyOEUKUldTT1VpVmpZeUZaeGR1Z1BUMXpZMUxRcys0REd5aEc5c3lMRUd5STFtSXk1WjNxMWdpelJFd3AK",
       "endpoints": [
         "http://192.168.90.5:8765/latest.json"
       ]

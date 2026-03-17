@@ -30,11 +30,18 @@ Set-Location $ProjectRoot
 if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
     $KeyFile = "src-tauri\assetagro.key"
     if (Test-Path $KeyFile) {
-        $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $KeyFile -Raw
+        $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $KeyFile -Raw).Trim()
         Write-Host "[deploy] Chave carregada de $KeyFile"
     } else {
         Write-Error "TAURI_SIGNING_PRIVATE_KEY não definida e $KeyFile não encontrado."
     }
+} else {
+    $env:TAURI_SIGNING_PRIVATE_KEY = $env:TAURI_SIGNING_PRIVATE_KEY.Trim()
+}
+
+# Senha da chave
+if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "Dedecdmm1902@66"
 }
 
 # --- 2. Build ---
@@ -42,13 +49,14 @@ Write-Host "[deploy] Compilando AssetAgro v$Version..."
 npm run tauri build
 if ($LASTEXITCODE -ne 0) { Write-Error "Build falhou." }
 
-# --- 3. Localizar artefatos ---
+# --- 3. Localizar instalador ---
 $BundleDir = "src-tauri\target\release\bundle\nsis"
 $ExeFile   = Get-ChildItem "$BundleDir\*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
-$SigFile   = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
-
 if (-not $ExeFile) { Write-Error "Instalador .exe não encontrado em $BundleDir" }
-if (-not $SigFile) { Write-Error "Arquivo .sig não encontrado. Certifique-se que TAURI_SIGNING_PRIVATE_KEY está correto." }
+
+# --- 3b. Localizar assinatura (gerada automaticamente pelo build) ---
+$SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
+if (-not $SigFile) { Write-Error "Arquivo .sig não gerado. Verifique se TAURI_SIGNING_PRIVATE_KEY está correta." }
 
 $ExeName = $ExeFile.Name
 $SigContent = Get-Content $SigFile.FullName -Raw
