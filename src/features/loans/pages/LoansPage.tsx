@@ -54,12 +54,12 @@ export const LoansPage: React.FC = () => {
     try {
       const data = await listarEmprestimos(statusFilter || undefined);
       setLoans(data);
-    } catch (e) {
-      toast('error', `Falha ao carregar: ${e}`);
+    } catch {
+      // erro silencioso — evita loop de re-render
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, toast]);
+  }, [statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
