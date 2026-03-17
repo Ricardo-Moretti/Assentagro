@@ -46,6 +46,7 @@
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM1NTkyMTYzNjMyNTUyOEUKUldTT1VpVmpZeUZaeGR1Z1BUMXpZMUxRcys0REd5aEc5c3lMRUd5STFtSXk1WjNxMWdpelJFd3AK",
+      "dangerousInsecureTransportProtocol": true,
       "endpoints": [
         "http://192.168.90.5:8765/latest.json"
       ]
