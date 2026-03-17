@@ -138,6 +138,7 @@ export const LoansPage: React.FC = () => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
+          title="Filtrar por status"
           className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os status</option>
@@ -359,6 +360,7 @@ const LoanFormModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({
             <select
               value={form.asset_id}
               onChange={(e) => set('asset_id', e.target.value)}
+              title="Selecionar equipamento"
               className={inputCls}
               size={4}
             >
@@ -391,7 +393,7 @@ const LoanFormModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({
             </div>
             <div>
               <label className={labelCls}>Filial destino</label>
-              <select value={form.destino_branch_id} onChange={(e) => set('destino_branch_id', e.target.value)} className={inputCls}>
+              <select value={form.destino_branch_id} onChange={(e) => set('destino_branch_id', e.target.value)} title="Filial destino" className={inputCls}>
                 <option value="">— Nenhuma —</option>
                 {BRANCHES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
@@ -402,11 +404,11 @@ const LoanFormModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Data de saída *</label>
-              <input type="date" value={form.data_saida} onChange={(e) => set('data_saida', e.target.value)} className={inputCls} />
+              <input type="date" value={form.data_saida} onChange={(e) => set('data_saida', e.target.value)} title="Data de saída" placeholder="dd/mm/aaaa" className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Previsão de retorno</label>
-              <input type="date" value={form.previsao_retorno} onChange={(e) => set('previsao_retorno', e.target.value)} className={inputCls} />
+              <input type="date" value={form.previsao_retorno} onChange={(e) => set('previsao_retorno', e.target.value)} title="Previsão de retorno" placeholder="dd/mm/aaaa" className={inputCls} />
             </div>
           </div>
 

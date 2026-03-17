@@ -165,6 +165,7 @@ export const UsersPage: React.FC = () => {
               <select
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'user' })}
+                title="Perfil do usuário"
                 className={cn(
                   'w-full px-3 py-2 text-sm rounded-lg border transition-colors',
                   'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
