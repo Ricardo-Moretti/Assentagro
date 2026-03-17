@@ -366,25 +366,36 @@ const LoanFormModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({
             <label className={labelCls}>Equipamento *</label>
             <input
               type="text"
-              placeholder="Buscar por service tag..."
+              placeholder="Buscar por service tag ou modelo..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={cn(inputCls, 'mb-2')}
+              onChange={(e) => { setSearch(e.target.value); set('asset_id', ''); }}
+              className={cn(inputCls, 'mb-1')}
             />
-            <select
-              value={form.asset_id}
-              onChange={(e) => set('asset_id', e.target.value)}
-              title="Selecionar equipamento"
-              className={inputCls}
-              size={4}
-            >
-              <option value="">— Selecione —</option>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.service_tag} {a.model ? `· ${a.model}` : ''}
-                </option>
-              ))}
-            </select>
+            {form.asset_id && (
+              <div className="mb-1 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 text-sm text-blue-700 dark:text-blue-300 flex items-center justify-between">
+                <span>✓ {assets.find(a => a.id === form.asset_id)?.service_tag ?? '—'} selecionado</span>
+                <button type="button" onClick={() => { set('asset_id', ''); setSearch(''); }} className="text-blue-400 hover:text-blue-600 text-xs ml-2">✕ Trocar</button>
+              </div>
+            )}
+            {!form.asset_id && (
+              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                {assets.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-slate-400 text-center">Nenhum equipamento encontrado</div>
+                ) : (
+                  assets.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => { set('asset_id', a.id); setSearch(a.service_tag); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b border-slate-100 dark:border-slate-800 last:border-0 transition-colors"
+                    >
+                      <span className="font-mono font-medium text-slate-900 dark:text-white">{a.service_tag}</span>
+                      {a.model && <span className="text-slate-400 ml-2">· {a.model}</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {/* Responsável */}
