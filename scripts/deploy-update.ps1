@@ -54,9 +54,16 @@ $BundleDir = "src-tauri\target\release\bundle\nsis"
 $ExeFile   = Get-ChildItem "$BundleDir\*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
 if (-not $ExeFile) { Write-Error "Instalador .exe não encontrado em $BundleDir" }
 
-# --- 3b. Localizar assinatura (gerada automaticamente pelo build) ---
+# --- 3b. Localizar ou gerar assinatura ---
 $SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
-if (-not $SigFile) { Write-Error "Arquivo .sig não gerado. Verifique se TAURI_SIGNING_PRIVATE_KEY está correta." }
+if (-not $SigFile) {
+    Write-Host "[deploy] .sig não gerado pelo build — assinando manualmente..."
+    npx tauri signer sign -f "src-tauri\assetagro.key" -p "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" $ExeFile.FullName
+    if ($LASTEXITCODE -ne 0) { Write-Error "Falha ao assinar o instalador." }
+    $SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
+    if (-not $SigFile) { Write-Error "Arquivo .sig não encontrado mesmo após assinatura manual." }
+    Write-Host "[deploy] Assinatura manual concluída."
+}
 
 $ExeName = $ExeFile.Name
 $SigContent = Get-Content $SigFile.FullName -Raw
