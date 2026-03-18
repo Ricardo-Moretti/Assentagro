@@ -66,16 +66,39 @@ const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
   }
 };
 
-export const App: React.FC = () => {
+// Conteúdo autenticado — renderizado DENTRO do ToastProvider
+// para que useUpdater() e outros hooks possam usar useToast()
+const AppContent: React.FC = () => {
   const { currentView } = useAppStore();
+
+  useKeyboardShortcuts();
+  useUpdater();
+
+  useEffect(() => {
+    verificarBackupAutomatico().catch(() => {});
+    registrarAcesso().catch(() => {});
+  }, []);
+
+  return (
+    <Layout>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentView}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.15 }}
+        >
+          <ViewRouter view={currentView} />
+        </motion.div>
+      </AnimatePresence>
+    </Layout>
+  );
+};
+
+export const App: React.FC = () => {
   const { theme } = useThemeStore();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-
-  // Atalhos de teclado (#12)
-  useKeyboardShortcuts();
-
-  // Auto-atualização via servidor interno
-  useUpdater();
 
   // Aplica tema no mount
   useEffect(() => {
@@ -90,31 +113,13 @@ export const App: React.FC = () => {
     }
   }, [theme]);
 
-  // Backup automático a cada 15 dias + log de acesso
-  useEffect(() => {
-    verificarBackupAutomatico().catch(() => {});
-    registrarAcesso().catch(() => {});
-  }, []);
-
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
   return (
     <ToastProvider>
-      <Layout>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentView}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
-          >
-            <ViewRouter view={currentView} />
-          </motion.div>
-        </AnimatePresence>
-      </Layout>
+      <AppContent />
       <OnboardingTour />
     </ToastProvider>
   );
