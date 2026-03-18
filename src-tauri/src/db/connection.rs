@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use log::info;
 use mysql::prelude::*;
-use mysql::*;
+use mysql::{OptsBuilder, Pool, PoolConstraints, PoolOpts};
 use std::path::Path;
 use std::time::Duration;
 
@@ -61,6 +61,14 @@ pub fn inicializar_banco(diretorio_app: &Path) -> Result<Pool> {
 
     info!("Conectando ao MySQL em {}:{}...", config.host, config.port);
 
+    // Pool pequeno: min 1, max 3 conexões por instância do app
+    let pool_opts = PoolOpts::new()
+        .with_constraints(
+            PoolConstraints::new(1, 3)
+                .context("Falha ao configurar PoolConstraints")?,
+        )
+        .with_reset_connection(false);
+
     let opts = OptsBuilder::new()
         .ip_or_hostname(Some(&config.host))
         .tcp_port(config.port)
@@ -69,7 +77,8 @@ pub fn inicializar_banco(diretorio_app: &Path) -> Result<Pool> {
         .db_name(Some(&config.database))
         .tcp_connect_timeout(Some(Duration::from_secs(5)))
         .read_timeout(Some(Duration::from_secs(10)))
-        .write_timeout(Some(Duration::from_secs(10)));
+        .write_timeout(Some(Duration::from_secs(10)))
+        .pool_opts(pool_opts);
 
     let pool = Pool::new(opts)
         .context("Falha ao conectar ao MySQL. Verifique db_config.json")?;
