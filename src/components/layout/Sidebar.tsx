@@ -59,6 +59,9 @@ export const Sidebar: React.FC = () => {
     if (item.view === 'dashboard' && notifications.aging_count > 0) {
       return { ...item, badge: notifications.aging_count };
     }
+    if (item.view === 'assets-list' && notifications.warranty_expiring > 0) {
+      return { ...item, badge: notifications.warranty_expiring };
+    }
     return item;
   });
 

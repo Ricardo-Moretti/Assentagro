@@ -210,6 +210,9 @@ export const obterCustosManutencao = (
 export const contarNotificacoes = (): Promise<NotificationCounts> =>
   invoke('contar_notificacoes');
 
+export const lerLogColetor = (): Promise<string> =>
+  invoke('ler_log_coletor');
+
 // Autenticação
 export const autenticarUsuario = (dados: LoginDto): Promise<User> =>
   invoke('autenticar_usuario', { dados });

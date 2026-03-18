@@ -486,34 +486,117 @@ pub fn importar_ativos(
 // BACKUP / RESTORE
 // ============================================================
 
-/// Cria backup do banco MySQL usando mysqldump.
-/// NOTA: Para MySQL, backup/restore requer acesso ao mysqldump CLI ou
-/// uma estratégia diferente. Esta implementação salva um dump SQL no destino.
-pub fn criar_backup(_conn: &mut PooledConn, destino: &str) -> Result<String> {
-    // TODO: Implementar backup via mysqldump ou outra estratégia para MySQL.
-    // Exemplo: executar `mysqldump` como processo externo, ou usar
-    // uma query para exportar dados em SQL.
-    // Por enquanto, retorna erro informativo.
-    Err(anyhow!(
-        "Backup MySQL não implementado via cópia de arquivo. Use mysqldump para exportar para: {}",
-        destino
-    ))
+/// Cria backup JSON de ativos, colaboradores, notas e empréstimos.
+pub fn criar_backup(conn: &mut PooledConn, destino: &str) -> Result<String> {
+    let assets = listar_ativos(conn, &AssetFilters::default())?;
+
+    let employees: Vec<serde_json::Value> = conn.query_map(
+        "SELECT id, name, branch_id, active, created_at FROM employees ORDER BY name",
+        |row: mysql::Row| serde_json::json!({
+            "id":         row.get::<String, _>("id").unwrap_or_default(),
+            "name":       row.get::<String, _>("name").unwrap_or_default(),
+            "branch_id":  row.get::<Option<String>, _>("branch_id").flatten(),
+            "active":     row.get::<i8, _>("active").unwrap_or(1) != 0,
+            "created_at": row.get::<String, _>("created_at").unwrap_or_default(),
+        }),
+    ).context("Falha ao exportar colaboradores")?;
+
+    let notes = listar_notas(conn, None)?;
+    let loans = listar_emprestimos(conn, None, None)?;
+
+    let backup = serde_json::json!({
+        "version":    2,
+        "created_at": Utc::now().to_rfc3339(),
+        "assets":     serde_json::to_value(&assets)?,
+        "employees":  employees,
+        "notes":      serde_json::to_value(&notes)?,
+        "loans":      serde_json::to_value(&loans)?,
+    });
+
+    let json_str = serde_json::to_string_pretty(&backup)
+        .context("Falha ao serializar backup")?;
+
+    std::fs::write(destino, &json_str)
+        .context("Falha ao salvar arquivo de backup")?;
+
+    Ok(destino.to_string())
 }
 
-/// Restaura backup MySQL a partir de um arquivo SQL dump.
-/// NOTA: Para MySQL, restore requer importação do dump SQL.
-pub fn restaurar_backup(_conn: &mut PooledConn, origem: &str) -> Result<()> {
-    let origem_path = std::path::Path::new(origem);
+/// Restaura backup JSON: faz REPLACE INTO em ativos, colaboradores, notas e empréstimos.
+/// Não apaga dados existentes — apenas atualiza/insere pelo ID.
+pub fn restaurar_backup(conn: &mut PooledConn, origem: &str) -> Result<()> {
+    let content = std::fs::read_to_string(origem)
+        .context("Arquivo de backup não encontrado ou ilegível")?;
 
-    if !origem_path.exists() {
-        return Err(anyhow!("Arquivo de backup não encontrado: {}", origem));
+    let backup: serde_json::Value = serde_json::from_str(&content)
+        .context("Arquivo de backup com formato inválido (esperado JSON)")?;
+
+    // ── Ativos ──────────────────────────────────────────────────────────
+    if let Ok(assets) = serde_json::from_value::<Vec<Asset>>(backup["assets"].clone()) {
+        for a in &assets {
+            conn.exec_drop(
+                "REPLACE INTO assets
+                 (id, service_tag, equipment_type, status, employee_name, branch_id,
+                  ram_gb, storage_capacity_gb, storage_type, os, cpu, model, year,
+                  notes, is_training, warranty_start, warranty_end, created_at, updated_at)
+                 VALUES (
+                  :id, :service_tag, :equipment_type, :status, :employee_name, :branch_id,
+                  :ram_gb, :storage_gb, :storage_type, :os, :cpu, :model, :year,
+                  :notes, :is_training, :warranty_start, :warranty_end, :created_at, :updated_at
+                 )",
+                params! {
+                    "id"            => &a.id,
+                    "service_tag"   => &a.service_tag,
+                    "equipment_type"=> &a.equipment_type,
+                    "status"        => &a.status,
+                    "employee_name" => &a.employee_name,
+                    "branch_id"     => &a.branch_id,
+                    "ram_gb"        => a.ram_gb,
+                    "storage_gb"    => a.storage_capacity_gb,
+                    "storage_type"  => &a.storage_type,
+                    "os"            => &a.os,
+                    "cpu"           => &a.cpu,
+                    "model"         => &a.model,
+                    "year"          => a.year,
+                    "notes"         => &a.notes,
+                    "is_training"   => a.is_training as i8,
+                    "warranty_start"=> &a.warranty_start,
+                    "warranty_end"  => &a.warranty_end,
+                    "created_at"    => &a.created_at,
+                    "updated_at"    => &a.updated_at,
+                },
+            ).context("Falha ao restaurar ativo")?;
+        }
     }
 
-    // TODO: Implementar restore via mysql client CLI ou leitura do dump SQL.
-    Err(anyhow!(
-        "Restore MySQL não implementado via cópia de arquivo. Use mysql client para importar: {}",
-        origem
-    ))
+    // ── Colaboradores ───────────────────────────────────────────────────
+    if let Some(employees) = backup["employees"].as_array() {
+        for e in employees {
+            let id   = e["id"].as_str().unwrap_or_default();
+            let name = e["name"].as_str().unwrap_or_default();
+            let bid  = e["branch_id"].as_str();
+            let act  = e["active"].as_bool().unwrap_or(true) as i8;
+            let cat  = e["created_at"].as_str().unwrap_or_default();
+            conn.exec_drop(
+                "REPLACE INTO employees (id, name, branch_id, active, created_at)
+                 VALUES (?, ?, ?, ?, ?)",
+                (id, name, bid, act, cat),
+            ).context("Falha ao restaurar colaborador")?;
+        }
+    }
+
+    // ── Notas ────────────────────────────────────────────────────────────
+    if let Ok(notes) = serde_json::from_value::<Vec<Nota>>(backup["notes"].clone()) {
+        for n in &notes {
+            conn.exec_drop(
+                "REPLACE INTO notes (id, titulo, corpo, categoria, autor, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (&n.id, &n.titulo, &n.corpo, &n.categoria, &n.autor, &n.created_at, &n.updated_at),
+            ).context("Falha ao restaurar nota")?;
+        }
+    }
+
+    Ok(())
 }
 
 // ============================================================
@@ -1760,7 +1843,34 @@ pub fn contar_notificacoes(conn: &mut PooledConn) -> Result<NotificationCounts> 
         .unwrap_or(Some(0))
         .unwrap_or(0);
 
-    Ok(NotificationCounts { maintenance_open, aging_count })
+    // Garantias a vencer nos próximos 90 dias (ou já vencidas, status != RETIRED)
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let in_90  = (Utc::now() + chrono::Duration::days(90)).format("%Y-%m-%d").to_string();
+    let warranty_expiring: i64 = conn
+        .exec_first::<i64, _, _>(
+            "SELECT COUNT(*) FROM assets
+             WHERE warranty_end IS NOT NULL AND warranty_end <= ? AND warranty_end >= ?
+             AND status != 'RETIRED'",
+            (&in_90, &today),
+        )
+        .unwrap_or(Some(0))
+        .unwrap_or(0);
+
+    Ok(NotificationCounts { maintenance_open, aging_count, warranty_expiring })
+}
+
+/// Lê as últimas linhas do log do coletor automático.
+pub fn ler_log_coletor() -> String {
+    let path = std::path::PathBuf::from(r"C:\ProgramData\AssetAgro\collector.log");
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            // Retorna as últimas 80 linhas
+            let lines: Vec<&str> = content.lines().collect();
+            let start = if lines.len() > 80 { lines.len() - 80 } else { 0 };
+            lines[start..].join("\n")
+        }
+        Err(e) => format!("Log do coletor não encontrado.\nCaminho: {}\nErro: {}", path.display(), e),
+    }
 }
 
 // ============================================================

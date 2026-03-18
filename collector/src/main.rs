@@ -18,9 +18,6 @@ const BRANCH_PENDENTE_ID:   &str = "br-pendente";
 const BRANCH_PENDENTE_NAME: &str = "Pendente";
 
 // ── Log de arquivo ─────────────────────────────────────────────────
-// Grava em C:\ProgramData\AssetAgro\collector.log
-// Rotaciona automaticamente quando ultrapassa 1 MB (mantém .bak)
-
 struct Logger {
     file: Option<fs::File>,
 }
@@ -46,7 +43,6 @@ impl Logger {
         Logger { file }
     }
 
-    /// Imprime no console E grava no arquivo
     fn log(&mut self, msg: &str) {
         println!("{}", msg);
         if let Some(ref mut f) = self.file {
@@ -54,7 +50,6 @@ impl Logger {
         }
     }
 
-    /// Grava apenas no arquivo (sem imprimir no console)
     fn log_file(&mut self, msg: &str) {
         if let Some(ref mut f) = self.file {
             let _ = writeln!(f, "{}", msg);
@@ -72,40 +67,59 @@ fn log_path() -> PathBuf {
     dir.join("collector.log")
 }
 
+// ── Executa PowerShell capturando stdout E stderr ──────────────────
+fn run_powershell(cmd: &str) -> (String, String) {
+    let result = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", cmd])
+        .output();
+
+    match result {
+        Ok(o) => {
+            let stdout = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&o.stderr).trim().to_string();
+            let err_msg = if !stderr.is_empty() {
+                stderr
+            } else if !o.status.success() {
+                format!("exit code {}", o.status.code().unwrap_or(-1))
+            } else {
+                String::new()
+            };
+            (stdout, err_msg)
+        }
+        Err(e) => (String::new(), format!("Falha ao iniciar PowerShell: {}", e)),
+    }
+}
+
 // ── Estrutura de dados coletados ───────────────────────────────────
 #[derive(Debug)]
 struct HardwareInfo {
     service_tag:        String,
-    equipment_type:     String, // NOTEBOOK ou DESKTOP
+    equipment_type:     String,
     model:              String,
     cpu:                String,
     ram_gb:             i64,
     storage_capacity_gb: i64,
-    storage_type:       String, // SSD_NVME, SSD_SATA, HDD
+    storage_type:       String,
     os:                 String,
-    employee_name:      String, // username Windows
+    employee_name:      String,
     hostname:           String,
 }
 
-// ── Funções de coleta via PowerShell/WMI ───────────────────────────
+// ── Coleta com logging de cada etapa ──────────────────────────────
 
-fn run_powershell(cmd: &str) -> String {
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", cmd])
-        .output();
-
-    match output {
-        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        Err(_) => String::new(),
+fn get_service_tag(log: &mut Logger) -> String {
+    let (tag, err) = run_powershell("(Get-WmiObject Win32_BIOS).SerialNumber");
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] Service Tag (BIOS) PowerShell: {}", err));
     }
-}
 
-fn get_service_tag() -> String {
-    let tag = run_powershell("(Get-WmiObject Win32_BIOS).SerialNumber");
     if tag.is_empty() || tag.to_uppercase().contains("NONE") || tag.to_uppercase().contains("DEFAULT") {
-        let alt = run_powershell("(Get-WmiObject Win32_SystemEnclosure).SerialNumber");
+        let (alt, err2) = run_powershell("(Get-WmiObject Win32_SystemEnclosure).SerialNumber");
+        if !err2.is_empty() {
+            log.log_file(&format!("  [WARN] Service Tag (Enclosure) PowerShell: {}", err2));
+        }
         if alt.is_empty() || alt.to_uppercase().contains("NONE") {
-            get_hostname()
+            get_hostname(log)
         } else {
             alt
         }
@@ -114,10 +128,13 @@ fn get_service_tag() -> String {
     }
 }
 
-fn get_equipment_type() -> String {
-    let chassis = run_powershell(
+fn get_equipment_type(log: &mut Logger) -> String {
+    let (chassis, err) = run_powershell(
         "(Get-WmiObject Win32_SystemEnclosure).ChassisTypes | Select-Object -First 1"
     );
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] Tipo equipamento PowerShell: {}", err));
+    }
     let chassis_num: i32 = chassis.trim().parse().unwrap_or(0);
     match chassis_num {
         9 | 10 | 14 | 31 | 32 => "NOTEBOOK".to_string(),
@@ -125,35 +142,53 @@ fn get_equipment_type() -> String {
     }
 }
 
-fn get_model() -> String {
-    let model = run_powershell("(Get-WmiObject Win32_ComputerSystem).Model");
+fn get_model(log: &mut Logger) -> String {
+    let (model, err) = run_powershell("(Get-WmiObject Win32_ComputerSystem).Model");
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] Modelo PowerShell: {}", err));
+    }
     if model.is_empty() { "Desconhecido".to_string() } else { model }
 }
 
-fn get_cpu() -> String {
-    let cpu = run_powershell("(Get-WmiObject Win32_Processor | Select-Object -First 1).Name");
+fn get_cpu(log: &mut Logger) -> String {
+    let (cpu, err) = run_powershell("(Get-WmiObject Win32_Processor | Select-Object -First 1).Name");
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] CPU PowerShell: {}", err));
+    }
     if cpu.is_empty() { "Desconhecido".to_string() } else { cpu }
 }
 
-fn get_ram_gb() -> i64 {
-    let ram_bytes = run_powershell("(Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory");
+fn get_ram_gb(log: &mut Logger) -> i64 {
+    let (ram_bytes, err) = run_powershell("(Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory");
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] RAM PowerShell: {}", err));
+    }
     let bytes: u64 = ram_bytes.trim().parse().unwrap_or(0);
     (bytes / (1024 * 1024 * 1024)) as i64
 }
 
-fn get_storage() -> (i64, String) {
-    let size_str = run_powershell(
+fn get_storage(log: &mut Logger) -> (i64, String) {
+    let (size_str, err1) = run_powershell(
         "(Get-WmiObject Win32_DiskDrive | Sort-Object Size -Descending | Select-Object -First 1).Size"
     );
+    if !err1.is_empty() {
+        log.log_file(&format!("  [WARN] Disco (tamanho) PowerShell: {}", err1));
+    }
     let size_bytes: u64 = size_str.trim().parse().unwrap_or(0);
     let size_gb = (size_bytes / (1024 * 1024 * 1024)) as i64;
 
-    let media_type = run_powershell(
+    let (media_type, err2) = run_powershell(
         "(Get-PhysicalDisk | Sort-Object Size -Descending | Select-Object -First 1).MediaType"
     );
-    let bus_type = run_powershell(
+    if !err2.is_empty() {
+        log.log_file(&format!("  [WARN] Disco (tipo) PowerShell: {}", err2));
+    }
+    let (bus_type, err3) = run_powershell(
         "(Get-PhysicalDisk | Sort-Object Size -Descending | Select-Object -First 1).BusType"
     );
+    if !err3.is_empty() {
+        log.log_file(&format!("  [WARN] Disco (bus) PowerShell: {}", err3));
+    }
 
     let storage_type = if media_type.contains("SSD") || media_type.contains("4") {
         if bus_type.contains("NVMe") || bus_type.contains("17") { "SSD_NVME" } else { "SSD_SATA" }
@@ -166,15 +201,21 @@ fn get_storage() -> (i64, String) {
     (size_gb, storage_type.to_string())
 }
 
-fn get_os() -> String {
-    let os = run_powershell(
+fn get_os(log: &mut Logger) -> String {
+    let (os, err) = run_powershell(
         "$o = Get-WmiObject Win32_OperatingSystem; \"$($o.Caption) $($o.Version)\""
     );
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] SO PowerShell: {}", err));
+    }
     if os.is_empty() { "Windows".to_string() } else { os }
 }
 
-fn get_windows_username() -> String {
-    let username = run_powershell("$env:USERNAME");
+fn get_windows_username(log: &mut Logger) -> String {
+    let (username, err) = run_powershell("$env:USERNAME");
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] Username PowerShell: {}", err));
+    }
     if username.is_empty() {
         std::env::var("USERNAME").unwrap_or_default()
     } else {
@@ -182,8 +223,11 @@ fn get_windows_username() -> String {
     }
 }
 
-fn get_hostname() -> String {
-    let hostname = run_powershell("$env:COMPUTERNAME");
+fn get_hostname(log: &mut Logger) -> String {
+    let (hostname, err) = run_powershell("$env:COMPUTERNAME");
+    if !err.is_empty() {
+        log.log_file(&format!("  [WARN] Hostname PowerShell: {}", err));
+    }
     if hostname.is_empty() {
         std::env::var("COMPUTERNAME").unwrap_or_else(|_| "UNKNOWN".to_string())
     } else {
@@ -191,33 +235,43 @@ fn get_hostname() -> String {
     }
 }
 
-// ── Coleta todas as informações ────────────────────────────────────
+// ── Coleta todas as informações (com log de cada etapa) ────────────
 
-fn coletar_hardware() -> HardwareInfo {
+fn coletar_hardware(log: &mut Logger) -> HardwareInfo {
+    log.log_file("  Coletando hardware...");
+
     println!("  [1/8] Service Tag...");
-    let service_tag = get_service_tag();
+    let service_tag = get_service_tag(log);
+    log.log_file(&format!("  [1/8] Service Tag    : {}", service_tag));
 
     println!("  [2/8] Tipo de equipamento...");
-    let equipment_type = get_equipment_type();
+    let equipment_type = get_equipment_type(log);
+    log.log_file(&format!("  [2/8] Tipo           : {}", equipment_type));
 
     println!("  [3/8] Modelo...");
-    let model = get_model();
+    let model = get_model(log);
+    log.log_file(&format!("  [3/8] Modelo         : {}", truncate(&model, 60)));
 
     println!("  [4/8] Processador...");
-    let cpu = get_cpu();
+    let cpu = get_cpu(log);
+    log.log_file(&format!("  [4/8] CPU            : {}", truncate(&cpu, 60)));
 
     println!("  [5/8] Memoria RAM...");
-    let ram_gb = get_ram_gb();
+    let ram_gb = get_ram_gb(log);
+    log.log_file(&format!("  [5/8] RAM            : {} GB", ram_gb));
 
     println!("  [6/8] Armazenamento...");
-    let (storage_capacity_gb, storage_type) = get_storage();
+    let (storage_capacity_gb, storage_type) = get_storage(log);
+    log.log_file(&format!("  [6/8] Disco          : {} GB ({})", storage_capacity_gb, storage_type));
 
     println!("  [7/8] Sistema operacional...");
-    let os = get_os();
+    let os = get_os(log);
+    log.log_file(&format!("  [7/8] SO             : {}", truncate(&os, 60)));
 
     println!("  [8/8] Usuario Windows...");
-    let employee_name = get_windows_username();
-    let hostname      = get_hostname();
+    let employee_name = get_windows_username(log);
+    let hostname      = get_hostname(log);
+    log.log_file(&format!("  [8/8] Usuario/Host   : {} / {}", employee_name, hostname));
 
     HardwareInfo {
         service_tag, equipment_type, model, cpu,
@@ -228,7 +282,8 @@ fn coletar_hardware() -> HardwareInfo {
 
 // ── Envia para o MySQL ─────────────────────────────────────────────
 
-fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::Error>> {
+fn enviar_para_banco(info: &HardwareInfo, log: &mut Logger) -> Result<String, Box<dyn std::error::Error>> {
+    log.log_file(&format!("  Conectando ao MySQL {}:{}...", MYSQL_HOST, MYSQL_PORT));
     println!("\n>> Conectando ao servidor MySQL ({})...", MYSQL_HOST);
 
     let opts = OptsBuilder::new()
@@ -243,6 +298,7 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
 
     let pool = Pool::new(opts)?;
     let mut conn = pool.get_conn()?;
+    log.log_file("  Conexão MySQL estabelecida.");
 
     conn.exec_drop(
         "INSERT IGNORE INTO branches (id, name) VALUES (?, ?)",
@@ -256,6 +312,7 @@ fn enviar_para_banco(info: &HardwareInfo) -> Result<String, Box<dyn std::error::
 
     if let Some(existing_id) = exists {
         println!("\n!! Service Tag '{}' ja existe (ID: {}). Atualizando...", info.service_tag, existing_id);
+        log.log_file(&format!("  Ativo existente ID={} — atualizando specs...", existing_id));
 
         let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         conn.exec_drop(
@@ -348,7 +405,10 @@ fn main() {
     println!();
     println!(">> Coletando informacoes de hardware...\n");
 
-    let info = coletar_hardware();
+    log.separador();
+    log.log_file(&format!("[{}] Iniciando coleta", timestamp));
+
+    let info = coletar_hardware(&mut log);
 
     println!("\n┌─────────────────────────────────────────────┐");
     println!("│ Informacoes Coletadas                       │");
@@ -365,19 +425,8 @@ fn main() {
     println!("└─────────────────────────────────────────────┘");
     println!();
 
-    // ── Grava entrada no log ───────────────────────────────────────
-    log.separador();
-    log.log_file(&format!("[{}] {} | {}", timestamp, info.hostname, info.employee_name));
-    log.log_file(&format!(
-        "  Hardware : {} | {} | {}GB RAM | {}GB {} | {}",
-        info.model, info.cpu, info.ram_gb,
-        info.storage_capacity_gb, info.storage_type, info.os
-    ));
-    log.log_file(&format!("  Tag      : {} | Tipo: {}", info.service_tag, info.equipment_type));
-    log.log_file(&format!("  Servidor : {}:{}", MYSQL_HOST, MYSQL_PORT));
-
     // ── Envia para o banco ─────────────────────────────────────────
-    match enviar_para_banco(&info) {
+    match enviar_para_banco(&info, &mut log) {
         Ok(id) => {
             log.log(">> SUCESSO! Ativo registrado no banco.");
             log.log(&format!("   ID: {}", id));
@@ -391,6 +440,17 @@ fn main() {
             log.log("");
             log.log(&format!("   Verifique se o servidor {} esta acessivel na porta {}", MYSQL_HOST, MYSQL_PORT));
             log.log_file(&format!("  Resultado: ERRO — {}", e));
+            log.log_file(&format!("  Log salvo em: {}", log_path().display()));
+
+            println!();
+            println!("Log salvo em: {}", log_path().display());
+            println!();
+            println!("Pressione ENTER para fechar...");
+            let mut _input = String::new();
+            std::io::stdin().read_line(&mut _input).ok();
+
+            // Exit code 1 para que a tarefa agendada registre a falha
+            std::process::exit(1);
         }
     }
 

@@ -444,6 +444,11 @@ pub fn contar_notificacoes(state: State<'_, AppState>) -> Result<NotificationCou
     queries::contar_notificacoes(&mut conn).map_err(err)
 }
 
+#[tauri::command]
+pub fn ler_log_coletor() -> String {
+    queries::ler_log_coletor()
+}
+
 // ============================================================
 // Autenticação
 // ============================================================

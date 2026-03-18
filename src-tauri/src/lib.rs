@@ -131,6 +131,7 @@ pub fn run() {
             commands::obter_custos_manutencao,
             // Notificações
             commands::contar_notificacoes,
+            commands::ler_log_coletor,
             // Autenticação
             commands::autenticar_usuario,
             commands::criar_usuario,

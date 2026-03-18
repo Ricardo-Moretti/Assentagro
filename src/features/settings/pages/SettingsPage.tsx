@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Sun, Moon, Monitor, Download, Upload, Loader2, Clock } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sun, Moon, Monitor, Download, Upload, Loader2, Clock, Terminal, RefreshCw } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { getVersion } from '@tauri-apps/api/app';
 import { cn } from '@/lib/utils';
 import { useThemeStore } from '@/stores/useThemeStore';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
-import { criarBackup, restaurarBackup, obterConfiguracao } from '@/data/commands';
+import { criarBackup, restaurarBackup, obterConfiguracao, lerLogColetor } from '@/data/commands';
 import type { Theme } from '@/domain/models';
 
 const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
@@ -23,6 +23,8 @@ export const SettingsPage: React.FC = () => {
   const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
   const [lastAccess, setLastAccess] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState('...');
+  const [collectorLog, setCollectorLog] = useState<string | null>(null);
+  const [loadingLog, setLoadingLog] = useState(false);
 
   useEffect(() => {
     obterConfiguracao('last_auto_backup').then(setLastAutoBackup).catch(() => {});
@@ -30,11 +32,23 @@ export const SettingsPage: React.FC = () => {
     getVersion().then(setAppVersion).catch(() => {});
   }, []);
 
+  const handleVerLog = useCallback(async () => {
+    setLoadingLog(true);
+    try {
+      const log = await lerLogColetor();
+      setCollectorLog(log);
+    } catch {
+      setCollectorLog('Erro ao ler log do coletor.');
+    } finally {
+      setLoadingLog(false);
+    }
+  }, []);
+
   const handleBackup = async () => {
     try {
       const destino = await save({
-        defaultPath: `assetagro-backup-${new Date().toISOString().slice(0, 10)}.db`,
-        filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+        defaultPath: `assetagro-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: 'AssetAgro Backup', extensions: ['json'] }],
       });
       if (!destino) return;
 
@@ -52,7 +66,7 @@ export const SettingsPage: React.FC = () => {
     try {
       const origem = await open({
         multiple: false,
-        filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+        filters: [{ name: 'AssetAgro Backup', extensions: ['json'] }],
       });
       if (!origem) return;
 
@@ -138,6 +152,37 @@ export const SettingsPage: React.FC = () => {
               : 'Nenhum backup automático realizado ainda'}
           </div>
         </div>
+      </div>
+
+      {/* Log do Coletor Automático */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Terminal className="h-4 w-4 text-slate-500" />
+              Coletor Automático
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Log do agente que coleta hardware das máquinas da rede.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleVerLog}
+            disabled={loadingLog}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+          >
+            {loadingLog
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <RefreshCw className="h-4 w-4" />}
+            {collectorLog ? 'Atualizar' : 'Ver Log'}
+          </button>
+        </div>
+        {collectorLog !== null && (
+          <pre className="text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 overflow-auto max-h-64 whitespace-pre-wrap">
+            {collectorLog}
+          </pre>
+        )}
       </div>
 
       {/* Sobre */}

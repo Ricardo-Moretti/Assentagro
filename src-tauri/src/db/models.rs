@@ -266,6 +266,7 @@ pub struct WarrantyAlert {
 pub struct NotificationCounts {
     pub maintenance_open: i64,
     pub aging_count: i64,
+    pub warranty_expiring: i64, // garantias a vencer em 90 dias
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

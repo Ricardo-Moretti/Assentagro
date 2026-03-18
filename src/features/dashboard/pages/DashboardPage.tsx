@@ -29,6 +29,7 @@ import { FleetAgeChart } from '../components/FleetAgeChart';
 import { BranchStatusChart } from '../components/BranchStatusChart';
 import { RecentMovements } from '../components/RecentMovements';
 import { AgingAlerts } from '../components/AgingAlerts';
+import { WarrantyAlerts } from '../components/WarrantyAlerts';
 import { AcquisitionTrend } from '../components/AcquisitionTrend';
 import { LoadingState } from '@/components/ui/Spinner';
 import { useDashboardData } from '../hooks/useDashboardData';
@@ -164,6 +165,9 @@ export const DashboardPage: React.FC = () => {
           />
         )}
       </div>
+
+      {/* Alertas de garantia a vencer */}
+      <WarrantyAlerts />
 
       {/* Alertas de envelhecimento */}
       <AgingAlerts />

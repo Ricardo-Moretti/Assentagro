@@ -8,6 +8,7 @@ export function useNotifications() {
   const [counts, setCounts] = useState<NotificationCounts>({
     maintenance_open: 0,
     aging_count: 0,
+    warranty_expiring: 0,
   });
 
   const refresh = useCallback(async () => {

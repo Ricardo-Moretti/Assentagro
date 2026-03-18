@@ -236,6 +236,7 @@ export interface WarrantyAlert {
 export interface NotificationCounts {
   maintenance_open: number;
   aging_count: number;
+  warranty_expiring: number; // garantias a vencer em 90 dias
 }
 
 // Custos de manutenção

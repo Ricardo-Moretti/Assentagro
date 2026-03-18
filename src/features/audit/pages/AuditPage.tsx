@@ -10,7 +10,9 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Eye,
+  FileDown,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { cn, formatDateTime } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/Spinner';
 import { listarAuditoria, listarAtivos } from '@/data/commands';
@@ -102,6 +104,24 @@ export const AuditPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const { viewAsset } = useAppStore();
 
+  const handleExport = () => {
+    const rows = filtered.map((e) => {
+      const parsed = parseChanges(e.changes_json);
+      return {
+        'Data/Hora': formatDateTime(e.changed_at),
+        'Service Tag': assets.get(e.asset_id) || e.asset_id.slice(0, 8),
+        'Ação': parsed.acao,
+        'Detalhes': parsed.fields
+          .map((f) => f.de !== undefined ? `${f.key}: ${f.de} → ${f.para}` : `${f.key}: ${f.value}`)
+          .join(' | '),
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Auditoria');
+    XLSX.writeFile(wb, `auditoria-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   useEffect(() => {
     Promise.all([listarAuditoria(), listarAtivos()])
       .then(([audits, assetList]) => {
@@ -138,16 +158,26 @@ export const AuditPage: React.FC = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Busca */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Buscar por service tag..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-agro-500"
-        />
+      {/* Busca + Export */}
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por service tag..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-agro-500"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleExport}
+          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        >
+          <FileDown className="h-4 w-4" />
+          Exportar Excel
+        </button>
       </div>
 
       {/* Timeline */}
