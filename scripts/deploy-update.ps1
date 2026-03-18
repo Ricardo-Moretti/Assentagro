@@ -1,5 +1,5 @@
 # ============================================================
-# AssetAgro — Script de Deploy de Atualização
+# AssetAgro - Script de Deploy de Atualização
 #
 # Uso (no computador de desenvolvimento):
 #   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content .\src-tauri\assetagro.key -Raw
@@ -44,20 +44,25 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
     $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "Dedecdmm1902@66"
 }
 
-# --- 2. Build ---
+# --- 2. Apagar .sig antigo para garantir nova assinatura apos o build ---
+$BundleDir = "src-tauri\target\release\bundle\nsis"
+Get-ChildItem "$BundleDir\*.sig" | Remove-Item -Force -ErrorAction SilentlyContinue
+Write-Host "[deploy] .sig anterior removido (sera re-assinado apos o build)"
+
+# --- 3. Build ---
 Write-Host "[deploy] Compilando AssetAgro v$Version..."
 npm run tauri build
 if ($LASTEXITCODE -ne 0) { Write-Error "Build falhou." }
 
-# --- 3. Localizar instalador ---
-$BundleDir = "src-tauri\target\release\bundle\nsis"
+# --- 4. Localizar instalador ---
 $ExeFile   = Get-ChildItem "$BundleDir\*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
 if (-not $ExeFile) { Write-Error "Instalador .exe não encontrado em $BundleDir" }
 
-# --- 3b. Localizar ou gerar assinatura ---
+# --- 4b. Localizar ou gerar assinatura ---
 $SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
 if (-not $SigFile) {
-    Write-Host "[deploy] .sig não gerado pelo build — assinando manualmente..."
+    Write-Host "[deploy] .sig não gerado pelo build - assinando manualmente..."
+    $env:TAURI_SIGNING_PRIVATE_KEY = ""
     npx tauri signer sign -f "src-tauri\assetagro.key" -p "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" $ExeFile.FullName
     if ($LASTEXITCODE -ne 0) { Write-Error "Falha ao assinar o instalador." }
     $SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
@@ -85,7 +90,7 @@ $LatestJson = @{
 } | ConvertTo-Json -Depth 5
 
 $LatestJsonPath = "$BundleDir\latest.json"
-# UTF-8 sem BOM — o parser do Tauri rejeita BOM silenciosamente
+# UTF-8 sem BOM - o parser do Tauri rejeita BOM silenciosamente
 $utf8NoBOM = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText((Resolve-Path -LiteralPath $BundleDir).Path + "\latest.json", $LatestJson, $utf8NoBOM)
 Write-Host "[deploy] latest.json gerado em $LatestJsonPath"
@@ -101,7 +106,7 @@ if (Test-Path $ServerShare) {
     Write-Host "   $($ExeFile.FullName)"
     Write-Host "   $($SigFile.FullName)"
     Write-Host "   $LatestJsonPath"
-    Write-Host "  → para: $ServerShare"
+    Write-Host "  -> para: $ServerShare"
 }
 
 Write-Host ""
