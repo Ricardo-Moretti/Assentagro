@@ -85,7 +85,9 @@ $LatestJson = @{
 } | ConvertTo-Json -Depth 5
 
 $LatestJsonPath = "$BundleDir\latest.json"
-$LatestJson | Out-File -Encoding UTF8 -FilePath $LatestJsonPath
+# UTF-8 sem BOM — o parser do Tauri rejeita BOM silenciosamente
+$utf8NoBOM = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText((Resolve-Path -LiteralPath $BundleDir).Path + "\latest.json", $LatestJson, $utf8NoBOM)
 Write-Host "[deploy] latest.json gerado em $LatestJsonPath"
 
 # --- 5. Copiar para o servidor ---
