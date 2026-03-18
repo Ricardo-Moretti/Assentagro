@@ -80,7 +80,14 @@ export const Topbar: React.FC = () => {
     setShowDropdown(false);
   };
 
-  // Check MySQL connection status every 30 seconds
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  // Check MySQL connection status every 60 seconds
   useEffect(() => {
     const checkConnection = () => {
       verificarConexao()
@@ -88,7 +95,7 @@ export const Topbar: React.FC = () => {
         .catch(() => setConnected(false));
     };
     checkConnection();
-    const interval = setInterval(checkConnection, 30000);
+    const interval = setInterval(checkConnection, 60_000);
     return () => clearInterval(interval);
   }, []);
 

@@ -61,10 +61,11 @@ pub fn inicializar_banco(diretorio_app: &Path) -> Result<Pool> {
 
     info!("Conectando ao MySQL em {}:{}...", config.host, config.port);
 
-    // Pool pequeno: min 1, max 3 conexões por instância do app
+    // Pool conservador: min 2, max 5 conexões por instância
+    // 16 filiais x 2 usuários x 5 = 80 conexões máx — dentro do limite MySQL (151 default)
     let pool_opts = PoolOpts::new()
         .with_constraints(
-            PoolConstraints::new(1, 3)
+            PoolConstraints::new(2, 5)
                 .context("Falha ao configurar PoolConstraints")?,
         )
         .with_reset_connection(false);

@@ -1,0 +1,10 @@
+C:\projetos\AssentAgro\collector\target\release\deps\derive_utils-f79d09524fd48299.d: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\error.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\ast.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\parse.rs
+
+C:\projetos\AssentAgro\collector\target\release\deps\libderive_utils-f79d09524fd48299.rlib: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\error.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\ast.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\parse.rs
+
+C:\projetos\AssentAgro\collector\target\release\deps\libderive_utils-f79d09524fd48299.rmeta: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\error.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\ast.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\parse.rs
+
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\lib.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\error.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\ast.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\derive_utils-0.15.1\src\parse.rs:

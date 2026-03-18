@@ -1,0 +1,14 @@
+C:\projetos\AssentAgro\collector\target\release\deps\clang_sys-4b977c0b580a9742.d: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\support.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\link.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/macros.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/common.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/dynamic.rs
+
+C:\projetos\AssentAgro\collector\target\release\deps\libclang_sys-4b977c0b580a9742.rlib: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\support.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\link.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/macros.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/common.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/dynamic.rs
+
+C:\projetos\AssentAgro\collector\target\release\deps\libclang_sys-4b977c0b580a9742.rmeta: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\support.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\link.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/macros.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/common.rs C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/dynamic.rs
+
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\lib.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\support.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\src\link.rs:
+C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/macros.rs:
+C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/common.rs:
+C:\projetos\AssentAgro\collector\target\release\build\clang-sys-c8e56cb06a4d70f2\out/dynamic.rs:
+
+# env-dep:OUT_DIR=C:\\projetos\\AssentAgro\\collector\\target\\release\\build\\clang-sys-c8e56cb06a4d70f2\\out

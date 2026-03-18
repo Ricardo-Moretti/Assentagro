@@ -1,0 +1,9 @@
+C:\projetos\AssentAgro\collector\target\release\build\clang-sys-e4c8892c31a5d087\build_script_build-e4c8892c31a5d087.d: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\macros.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\common.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\dynamic.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\static.rs
+
+C:\projetos\AssentAgro\collector\target\release\build\clang-sys-e4c8892c31a5d087\build_script_build-e4c8892c31a5d087.exe: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\macros.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\common.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\dynamic.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\static.rs
+
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\macros.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\common.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\dynamic.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\clang-sys-1.8.1\build\static.rs:

@@ -7,7 +7,9 @@
       "Bash(npx @tauri-apps/cli icon:*)",
       "Read(//c/projetos/AssentAgro/src-tauri/**)",
       "Bash(npx --yes @aspect-build/rules_js:*)",
-      "Bash(\"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" installer.iss)"
+      "Bash(\"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" installer.iss)",
+      "Bash(\"C:/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" \"C:/projetos/AssentAgro/collector/installer.iss\" 2>&1)",
+      "Bash(cd:*)"
     ],
     "additionalDirectories": [
       "C:\\projetos\\AssentAgro\\src-tauri\\$APPDATA\\com.tracbelagro.assetagro"

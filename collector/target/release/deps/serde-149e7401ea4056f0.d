@@ -1,0 +1,14 @@
+C:\projetos\AssentAgro\collector\target\release\deps\serde-149e7401ea4056f0.d: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\projetos\AssentAgro\collector\target\release\build\serde-282a76ecf9fa1911\out/private.rs
+
+C:\projetos\AssentAgro\collector\target\release\deps\libserde-149e7401ea4056f0.rlib: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\projetos\AssentAgro\collector\target\release\build\serde-282a76ecf9fa1911\out/private.rs
+
+C:\projetos\AssentAgro\collector\target\release\deps\libserde-149e7401ea4056f0.rmeta: C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\projetos\AssentAgro\collector\target\release\build\serde-282a76ecf9fa1911\out/private.rs
+
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs:
+C:\Users\ricardo.moretti\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs:
+C:\projetos\AssentAgro\collector\target\release\build\serde-282a76ecf9fa1911\out/private.rs:
+
+# env-dep:OUT_DIR=C:\\projetos\\AssentAgro\\collector\\target\\release\\build\\serde-282a76ecf9fa1911\\out

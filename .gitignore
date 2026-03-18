@@ -30,3 +30,8 @@ src-tauri/gen/
 # Tauri signing keys (nunca versionar)
 src-tauri/*.key
 src-tauri/*.key.pub
+src-tauri/*.key.bak
+src-tauri/*.key.pub.bak
+
+# Config com credenciais de banco (nunca versionar)
+db_config.json

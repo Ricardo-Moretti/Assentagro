@@ -20,10 +20,26 @@ pub fn run() {
             let app_dir = app
                 .path()
                 .app_data_dir()
-                .expect("Falha ao resolver diretório de dados");
+                .map_err(|e| format!("Falha ao resolver diretório de dados: {e}"))?;
 
-            let pool =
-                db::connection::inicializar_banco(&app_dir).expect("Falha ao inicializar banco MySQL");
+            let pool = db::connection::inicializar_banco(&app_dir).map_err(|e| {
+                // Exibe diálogo de erro antes de fechar — usuário vê a causa
+                let msg = format!(
+                    "Não foi possível conectar ao banco de dados MySQL.\n\n\
+                     Verifique se o servidor MySQL está online e se o arquivo \
+                     db_config.json está correto.\n\nDetalhe: {e}"
+                );
+                log::error!("{}", msg);
+                // Tenta mostrar janela de erro nativa
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = tauri_plugin_dialog::DialogExt::dialog(app)
+                        .message(&msg)
+                        .title("AssetAgro — Erro de Conexão")
+                        .blocking_show();
+                }
+                msg
+            })?;
 
             app.manage(AppState {
                 db: pool,
@@ -59,7 +75,9 @@ pub fn run() {
                 .build(app)?;
 
             // Minimizar para tray ao fechar
-            let main_window = app.get_webview_window("main").unwrap();
+            let main_window = app
+                .get_webview_window("main")
+                .ok_or("Janela principal não encontrada")?;
             let win_clone = main_window.clone();
             main_window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
