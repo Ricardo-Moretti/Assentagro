@@ -345,7 +345,8 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
     Ok(())
 }
 
-/// Creates the default admin user if no users exist
+/// Creates the default admin user if no users exist.
+/// Password is read from env ASSETAGRO_ADMIN_PASS or generated randomly.
 fn seed_admin_user(conn: &mut PooledConn) -> Result<()> {
     let count: i64 = conn
         .query_first("SELECT COUNT(*) FROM users")
@@ -353,8 +354,28 @@ fn seed_admin_user(conn: &mut PooledConn) -> Result<()> {
         .unwrap_or(0);
 
     if count == 0 {
+        let default_pass = std::env::var("ASSETAGRO_ADMIN_PASS").unwrap_or_else(|_| {
+            // Gera senha aleatória de 16 caracteres
+            use std::fmt::Write;
+            let bytes: [u8; 12] = {
+                let mut buf = [0u8; 12];
+                // Usa timestamp + uuid como entropia
+                let seed = uuid::Uuid::new_v4().to_string();
+                for (i, b) in seed.bytes().enumerate().take(12) {
+                    buf[i] = b;
+                }
+                buf
+            };
+            let mut s = String::with_capacity(16);
+            for b in &bytes {
+                let _ = write!(s, "{:02x}", b);
+            }
+            s.truncate(16);
+            s
+        });
+
         let password_hash =
-            hash("Tracbel@2025!", DEFAULT_COST).context("Falha ao gerar hash da senha")?;
+            hash(&default_pass, DEFAULT_COST).context("Falha ao gerar hash da senha")?;
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
 
@@ -363,7 +384,12 @@ fn seed_admin_user(conn: &mut PooledConn) -> Result<()> {
              VALUES (?, ?, ?, ?, ?, 1, ?)",
             (&id, "admin", &password_hash, "Administrador", "admin", &now),
         )?;
-        info!("Usuário admin padrão criado.");
+        info!("===================================================");
+        info!("  USUARIO ADMIN CRIADO");
+        info!("  Login:  admin");
+        info!("  Senha:  {}", default_pass);
+        info!("  TROQUE A SENHA IMEDIATAMENTE APOS O PRIMEIRO LOGIN");
+        info!("===================================================");
     }
 
     Ok(())

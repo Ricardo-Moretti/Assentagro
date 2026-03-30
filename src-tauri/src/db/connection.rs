@@ -20,11 +20,14 @@ pub struct DbConfig {
 impl Default for DbConfig {
     fn default() -> Self {
         Self {
-            host: "192.168.90.5".to_string(),
-            port: 3306,
-            user: "assetagro".to_string(),
-            password: "AssetAgro@2025!".to_string(),
-            database: "assetagro".to_string(),
+            host: std::env::var("ASSETAGRO_DB_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            port: std::env::var("ASSETAGRO_DB_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(3306),
+            user: std::env::var("ASSETAGRO_DB_USER").unwrap_or_else(|_| "assetagro".to_string()),
+            password: std::env::var("ASSETAGRO_DB_PASS").unwrap_or_else(|_| String::new()),
+            database: std::env::var("ASSETAGRO_DB_NAME").unwrap_or_else(|_| "assetagro".to_string()),
         }
     }
 }
@@ -42,12 +45,15 @@ pub fn carregar_config(diretorio_app: &Path) -> DbConfig {
         }
     }
 
-    // Se não existe, cria arquivo padrão para o usuário editar
+    // Se não existe, cria arquivo modelo para o usuário preencher
     let default_config = DbConfig::default();
     let _ = std::fs::create_dir_all(diretorio_app);
     let json = serde_json::to_string_pretty(&default_config).unwrap_or_default();
     let _ = std::fs::write(&config_path, &json);
-    info!("Arquivo db_config.json criado com valores padrão em: {:?}", config_path);
+    info!(
+        "Arquivo db_config.json criado em: {:?}. Preencha host e password antes de iniciar.",
+        config_path
+    );
 
     default_config
 }

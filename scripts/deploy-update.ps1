@@ -39,9 +39,9 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
     $env:TAURI_SIGNING_PRIVATE_KEY = $env:TAURI_SIGNING_PRIVATE_KEY.Trim()
 }
 
-# Senha da chave
+# Senha da chave — DEVE ser definida como variável de ambiente antes do deploy
 if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "Dedecdmm1902@66"
+    Write-Error "TAURI_SIGNING_PRIVATE_KEY_PASSWORD nao definida. Defina com: `$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = 'sua-senha'"
 }
 
 # --- 2. Apagar .sig antigo para garantir nova assinatura apos o build ---

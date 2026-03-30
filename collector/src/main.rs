@@ -7,12 +7,28 @@ use std::process::Command;
 use std::time::Duration;
 use mysql::params;
 
-// ── Configuração do MySQL ──────────────────────────────────────────
-const MYSQL_HOST: &str = "192.168.90.5";
-const MYSQL_PORT: u16 = 3306;
-const MYSQL_USER: &str = "assetagro";
-const MYSQL_PASS: &str = "AssetAgro@2025!";
-const MYSQL_DB:   &str = "assetagro";
+// ── Configuração do MySQL (via variáveis de ambiente ou collector_config.json) ──
+fn mysql_host() -> String { std::env::var("ASSETAGRO_DB_HOST").unwrap_or_else(|_| load_collector_cfg("host", "localhost")) }
+fn mysql_port() -> u16   { std::env::var("ASSETAGRO_DB_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or_else(|| load_collector_cfg("port", "3306").parse().unwrap_or(3306)) }
+fn mysql_user() -> String { std::env::var("ASSETAGRO_DB_USER").unwrap_or_else(|_| load_collector_cfg("user", "assetagro")) }
+fn mysql_pass() -> String { std::env::var("ASSETAGRO_DB_PASS").unwrap_or_else(|_| load_collector_cfg("password", "")) }
+fn mysql_db()   -> String { std::env::var("ASSETAGRO_DB_NAME").unwrap_or_else(|_| load_collector_cfg("database", "assetagro")) }
+
+fn load_collector_cfg(key: &str, default: &str) -> String {
+    let config_path = PathBuf::from(r"C:\ProgramData\AssetAgro\collector_config.json");
+    if let Ok(content) = fs::read_to_string(&config_path) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(val) = json.get(key).and_then(|v| v.as_str()) {
+                return val.to_string();
+            }
+            // port vem como numero no JSON
+            if let Some(val) = json.get(key).and_then(|v| v.as_u64()) {
+                return val.to_string();
+            }
+        }
+    }
+    default.to_string()
+}
 
 const BRANCH_PENDENTE_ID:   &str = "br-pendente";
 const BRANCH_PENDENTE_NAME: &str = "Pendente";
@@ -283,15 +299,21 @@ fn coletar_hardware(log: &mut Logger) -> HardwareInfo {
 // ── Envia para o MySQL ─────────────────────────────────────────────
 
 fn enviar_para_banco(info: &HardwareInfo, log: &mut Logger) -> Result<String, Box<dyn std::error::Error>> {
-    log.log_file(&format!("  Conectando ao MySQL {}:{}...", MYSQL_HOST, MYSQL_PORT));
-    println!("\n>> Conectando ao servidor MySQL ({})...", MYSQL_HOST);
+    let host = mysql_host();
+    let port = mysql_port();
+    let user = mysql_user();
+    let pass = mysql_pass();
+    let db   = mysql_db();
+
+    log.log_file(&format!("  Conectando ao MySQL {}:{}...", host, port));
+    println!("\n>> Conectando ao servidor MySQL ({})...", host);
 
     let opts = OptsBuilder::new()
-        .ip_or_hostname(Some(MYSQL_HOST))
-        .tcp_port(MYSQL_PORT)
-        .user(Some(MYSQL_USER))
-        .pass(Some(MYSQL_PASS))
-        .db_name(Some(MYSQL_DB))
+        .ip_or_hostname(Some(&*host))
+        .tcp_port(port)
+        .user(Some(&*user))
+        .pass(Some(&*pass))
+        .db_name(Some(&*db))
         .tcp_connect_timeout(Some(Duration::from_secs(10)))
         .read_timeout(Some(Duration::from_secs(10)))
         .write_timeout(Some(Duration::from_secs(10)));
@@ -438,7 +460,7 @@ fn main() {
             log.log(">> ERRO ao enviar para o banco:");
             log.log(&format!("   {}", e));
             log.log("");
-            log.log(&format!("   Verifique se o servidor {} esta acessivel na porta {}", MYSQL_HOST, MYSQL_PORT));
+            log.log(&format!("   Verifique se o servidor esta acessivel (veja collector_config.json)"));
             log.log_file(&format!("  Resultado: ERRO — {}", e));
             log.log_file(&format!("  Log salvo em: {}", log_path().display()));
 

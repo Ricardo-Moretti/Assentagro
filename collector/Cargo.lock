@@ -61,6 +61,7 @@ version = "1.0.0"
 dependencies = [
  "chrono",
  "mysql",
+ "serde_json",
  "uuid",
 ]
 
