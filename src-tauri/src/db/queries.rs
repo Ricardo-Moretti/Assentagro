@@ -40,6 +40,8 @@ const ASSET_SELECT: &str =
      FROM assets a
      LEFT JOIN branches b ON b.id = a.branch_id";
 
+const ASSET_NOT_DELETED: &str = "a.deleted_at IS NULL";
+
 // ============================================================
 // BRANCHES — somente leitura (populadas pelo seed)
 // ============================================================
@@ -60,7 +62,7 @@ pub fn listar_filiais(conn: &mut PooledConn) -> Result<Vec<Branch>> {
 
 /// Lista ativos com filtros dinâmicos, busca e ordenação
 pub fn listar_ativos(conn: &mut PooledConn, filtros: &AssetFilters) -> Result<Vec<Asset>> {
-    let mut where_clauses: Vec<String> = Vec::new();
+    let mut where_clauses: Vec<String> = vec![ASSET_NOT_DELETED.to_string()];
     let mut param_values: Vec<mysql::Value> = Vec::new();
 
     // Busca textual (service_tag, employee_name, cpu, os)
@@ -156,7 +158,7 @@ pub fn listar_ativos(conn: &mut PooledConn, filtros: &AssetFilters) -> Result<Ve
 
 /// Busca um ativo pelo ID
 pub fn obter_ativo(conn: &mut PooledConn, id: &str) -> Result<Asset> {
-    let sql = format!("{} WHERE a.id = ?", ASSET_SELECT);
+    let sql = format!("{} WHERE a.id = ? AND {}", ASSET_SELECT, ASSET_NOT_DELETED);
     let rows: Vec<mysql::Row> = conn
         .exec(&sql, (id,))
         .context("Falha ao buscar ativo")?;
@@ -168,7 +170,7 @@ pub fn obter_ativo(conn: &mut PooledConn, id: &str) -> Result<Asset> {
 }
 
 /// Cria um novo ativo (com registro de auditoria)
-pub fn criar_ativo(conn: &mut PooledConn, dto: &CreateAssetDto) -> Result<Asset> {
+pub fn criar_ativo(conn: &mut PooledConn, dto: &CreateAssetDto, usuario: &str) -> Result<Asset> {
     // Validação: IN_USE exige employee_name
     if dto.status == "IN_USE" {
         if dto.employee_name.as_ref().map_or(true, |n| n.trim().is_empty()) {
@@ -231,13 +233,13 @@ pub fn criar_ativo(conn: &mut PooledConn, dto: &CreateAssetDto) -> Result<Asset>
     registrar_auditoria(conn, &id, &serde_json::json!({
         "acao": "CRIADO",
         "service_tag": dto.service_tag.trim(),
-    }))?;
+    }), usuario)?;
 
     obter_ativo(conn, &id)
 }
 
 /// Atualiza um ativo existente (atualiza todos os campos enviados)
-pub fn atualizar_ativo(conn: &mut PooledConn, id: &str, dto: &UpdateAssetDto) -> Result<Asset> {
+pub fn atualizar_ativo(conn: &mut PooledConn, id: &str, dto: &UpdateAssetDto, usuario: &str) -> Result<Asset> {
     // Busca ativo atual para merge
     let atual = obter_ativo(conn, id)?;
 
@@ -330,22 +332,25 @@ pub fn atualizar_ativo(conn: &mut PooledConn, id: &str, dto: &UpdateAssetDto) ->
     if ram_gb != atual.ram_gb { diffs.insert("ram_gb".into(), serde_json::json!({"de": atual.ram_gb, "para": ram_gb})); }
     if storage_capacity_gb != atual.storage_capacity_gb { diffs.insert("storage_capacity_gb".into(), serde_json::json!({"de": atual.storage_capacity_gb, "para": storage_capacity_gb})); }
     if storage_type != atual.storage_type { diffs.insert("storage_type".into(), serde_json::json!({"de": atual.storage_type, "para": storage_type})); }
-    registrar_auditoria(conn, id, &serde_json::Value::Object(diffs))?;
+    registrar_auditoria(conn, id, &serde_json::Value::Object(diffs), usuario)?;
 
     obter_ativo(conn, id)
 }
 
 /// Exclui um ativo pelo ID (com auditoria)
-pub fn excluir_ativo(conn: &mut PooledConn, id: &str) -> Result<()> {
-    // Busca antes de excluir para registrar auditoria
+pub fn excluir_ativo(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<()> {
     let ativo = obter_ativo(conn, id).ok();
 
-    conn.exec_drop("DELETE FROM assets WHERE id = ?", (id,))
-        .context("Falha ao excluir ativo")?;
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "UPDATE assets SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+        (&now, usuario, &now, id),
+    ).context("Falha ao excluir ativo")?;
 
     let rows = conn.affected_rows();
     if rows == 0 {
-        return Err(anyhow!("Ativo não encontrado para exclusão"));
+        return Err(anyhow!("Ativo nao encontrado para exclusao"));
     }
 
     if let Some(a) = ativo {
@@ -353,7 +358,7 @@ pub fn excluir_ativo(conn: &mut PooledConn, id: &str) -> Result<()> {
             "acao": "EXCLUIDO",
             "service_tag": a.service_tag,
             "filial": a.branch_name,
-        }))?;
+        }), usuario)?;
     }
 
     Ok(())
@@ -363,15 +368,16 @@ pub fn excluir_ativo(conn: &mut PooledConn, id: &str) -> Result<()> {
 // AUDITORIA — registro de alterações
 // ============================================================
 
-fn registrar_auditoria(conn: &mut PooledConn, asset_id: &str, changes: &serde_json::Value) -> Result<()> {
+fn registrar_auditoria(conn: &mut PooledConn, asset_id: &str, changes: &serde_json::Value, changed_by: &str) -> Result<()> {
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let json = serde_json::to_string(changes).unwrap_or_default();
+    let by = if changed_by.is_empty() { "sistema" } else { changed_by };
 
     conn.exec_drop(
-        "INSERT INTO asset_audit (id, asset_id, changed_at, changes_json)
-         VALUES (?, ?, ?, ?)",
-        (&id, asset_id, &now, &json),
+        "INSERT INTO asset_audit (id, asset_id, changed_at, changes_json, changed_by)
+         VALUES (?, ?, ?, ?, ?)",
+        (&id, asset_id, &now, &json, by),
     )
     .context("Falha ao registrar auditoria")?;
 
@@ -383,18 +389,18 @@ pub fn listar_auditoria(conn: &mut PooledConn, asset_id: Option<&str>) -> Result
     let entries = match asset_id {
         Some(id) => {
             conn.exec_map(
-                "SELECT id, asset_id, changed_at, changes_json FROM asset_audit WHERE asset_id = ? ORDER BY changed_at DESC LIMIT 500",
+                "SELECT id, asset_id, changed_at, changes_json, changed_by FROM asset_audit WHERE asset_id = ? ORDER BY changed_at DESC LIMIT 500",
                 (id,),
-                |(id, asset_id, changed_at, changes_json): (String, String, String, String)| {
-                    AuditEntry { id, asset_id, changed_at, changes_json }
+                |(id, asset_id, changed_at, changes_json, changed_by): (String, String, String, String, Option<String>)| {
+                    AuditEntry { id, asset_id, changed_at, changes_json, changed_by }
                 },
             ).context("Falha ao listar auditoria")?
         }
         None => {
             conn.query_map(
-                "SELECT id, asset_id, changed_at, changes_json FROM asset_audit ORDER BY changed_at DESC LIMIT 500",
-                |(id, asset_id, changed_at, changes_json): (String, String, String, String)| {
-                    AuditEntry { id, asset_id, changed_at, changes_json }
+                "SELECT id, asset_id, changed_at, changes_json, changed_by FROM asset_audit ORDER BY changed_at DESC LIMIT 500",
+                |(id, asset_id, changed_at, changes_json, changed_by): (String, String, String, String, Option<String>)| {
+                    AuditEntry { id, asset_id, changed_at, changes_json, changed_by }
                 },
             ).context("Falha ao listar auditoria")?
         }
@@ -423,6 +429,7 @@ pub fn importar_ativos(
     conn: &mut PooledConn,
     ativos: &[CreateAssetDto],
     modo: &str,
+    usuario: &str,
 ) -> Result<ImportResult> {
     let mut result = ImportResult {
         total: ativos.len(),
@@ -463,7 +470,7 @@ pub fn importar_ativos(
                     warranty_start: None,
                     warranty_end: None,
                 };
-                match atualizar_ativo(conn, &existing_id, &update_dto) {
+                match atualizar_ativo(conn, &existing_id, &update_dto, usuario) {
                     Ok(_) => result.updated += 1,
                     Err(e) => result.errors.push(format!("Linha {}: {}", idx, e)),
                 }
@@ -472,7 +479,7 @@ pub fn importar_ativos(
             }
         } else {
             // Cria novo
-            match criar_ativo(conn, dto) {
+            match criar_ativo(conn, dto, usuario) {
                 Ok(_) => result.created += 1,
                 Err(e) => result.errors.push(format!("Linha {}: {}", idx, e)),
             }
@@ -624,8 +631,8 @@ pub fn obter_dados_dashboard(conn: &mut PooledConn, branch_id: Option<&str>) -> 
 
 fn obter_stats(conn: &mut PooledConn, branch_id: Option<&str>) -> Result<DashboardStats> {
     let (where_clause, params) = match branch_id {
-        Some(bid) => (" WHERE branch_id = ?".to_string(), vec![mysql::Value::from(bid)]),
-        None => (String::new(), vec![]),
+        Some(bid) => (" WHERE deleted_at IS NULL AND branch_id = ?".to_string(), vec![mysql::Value::from(bid)]),
+        None => (" WHERE deleted_at IS NULL".to_string(), vec![]),
     };
     let sql = format!(
         "SELECT
@@ -636,17 +643,51 @@ fn obter_stats(conn: &mut PooledConn, branch_id: Option<&str>) -> Result<Dashboa
             COUNT(CASE WHEN status = 'RETIRED' THEN 1 END) as retired,
             COUNT(CASE WHEN equipment_type = 'NOTEBOOK' THEN 1 END) as notebooks,
             COUNT(CASE WHEN equipment_type = 'DESKTOP' THEN 1 END) as desktops,
-            COUNT(CASE WHEN status = 'IN_USE' AND (employee_name IS NULL OR employee_name = '') THEN 1 END) as in_use_no_employee
+            COUNT(CASE WHEN status = 'IN_USE' AND (employee_name IS NULL OR employee_name = '') THEN 1 END) as in_use_no_employee,
+            COUNT(CASE WHEN is_training = 1 THEN 1 END) as training
          FROM assets{}",
         where_clause
     );
 
-    let result: Option<(i64, i64, i64, i64, i64, i64, i64, i64)> = conn
+    let result: Option<(i64, i64, i64, i64, i64, i64, i64, i64, i64)> = conn
         .exec_first(&sql, mysql::Params::Positional(params))
         .context("Falha ao obter estatísticas do dashboard")?;
 
+    // Custo total de manutencao
+    let maintenance_total_cost: f64 = conn
+        .exec_first::<f64, _, _>(
+            "SELECT COALESCE(SUM(cost), 0) FROM maintenance_records",
+            (),
+        )
+        .unwrap_or(Some(0.0))
+        .unwrap_or(0.0);
+
+    // Tempo medio em manutencao (dias) - apenas registros fechados
+    let avg_maintenance_days: f64 = conn
+        .exec_first::<f64, _, _>(
+            "SELECT COALESCE(AVG(DATEDIFF(returned_at, sent_at)), 0) FROM maintenance_records WHERE status = 'CLOSED' AND returned_at IS NOT NULL",
+            (),
+        )
+        .unwrap_or(Some(0.0))
+        .unwrap_or(0.0);
+
     match result {
-        Some((total, in_use, stock, maintenance, retired, notebooks, desktops, in_use_no_employee)) => {
+        Some((total, in_use, stock, maintenance, retired, notebooks, desktops, in_use_no_employee, training)) => {
+            // Ativos por colaborador (media)
+            let employees_with_assets: f64 = conn
+                .exec_first::<f64, _, _>(
+                    "SELECT COUNT(DISTINCT employee_name) FROM assets WHERE employee_name IS NOT NULL AND employee_name != '' AND status = 'IN_USE' AND deleted_at IS NULL",
+                    (),
+                )
+                .unwrap_or(Some(0.0))
+                .unwrap_or(0.0);
+
+            let assets_per_employee = if employees_with_assets > 0.0 {
+                in_use as f64 / employees_with_assets
+            } else {
+                0.0
+            };
+
             Ok(DashboardStats {
                 total,
                 in_use,
@@ -656,6 +697,10 @@ fn obter_stats(conn: &mut PooledConn, branch_id: Option<&str>) -> Result<Dashboa
                 notebooks,
                 desktops,
                 in_use_no_employee,
+                training,
+                maintenance_total_cost,
+                avg_maintenance_days,
+                assets_per_employee,
             })
         }
         None => Ok(DashboardStats {
@@ -667,6 +712,10 @@ fn obter_stats(conn: &mut PooledConn, branch_id: Option<&str>) -> Result<Dashboa
             notebooks: 0,
             desktops: 0,
             in_use_no_employee: 0,
+            training: 0,
+            maintenance_total_cost,
+            avg_maintenance_days,
+            assets_per_employee: 0.0,
         }),
     }
 }
@@ -681,7 +730,7 @@ fn obter_contagem_por_filial(conn: &mut PooledConn) -> Result<Vec<BranchCount>> 
                 COUNT(CASE WHEN a.status = 'MAINTENANCE' THEN 1 END) as maintenance,
                 COUNT(CASE WHEN a.status = 'RETIRED' THEN 1 END) as retired
              FROM branches b
-             LEFT JOIN assets a ON a.branch_id = b.id
+             LEFT JOIN assets a ON a.branch_id = b.id AND a.deleted_at IS NULL
              GROUP BY b.id, b.name
              ORDER BY total DESC, b.name ASC",
             |(branch_id, branch_name, total, in_use, stock, maintenance, retired): (
@@ -711,8 +760,8 @@ fn obter_contagem_por_grupo(conn: &mut PooledConn, coluna: &str, branch_id: Opti
     }
 
     let (where_clause, params) = match branch_id {
-        Some(bid) => (" WHERE branch_id = ?".to_string(), vec![mysql::Value::from(bid)]),
-        None => (String::new(), vec![]),
+        Some(bid) => (" WHERE deleted_at IS NULL AND branch_id = ?".to_string(), vec![mysql::Value::from(bid)]),
+        None => (" WHERE deleted_at IS NULL".to_string(), vec![]),
     };
     let sql = format!(
         "SELECT COALESCE({col}, 'N/A') as label, COUNT(*) as total
@@ -736,8 +785,8 @@ fn obter_contagem_por_grupo(conn: &mut PooledConn, coluna: &str, branch_id: Opti
 
 fn obter_contagem_por_ram(conn: &mut PooledConn, branch_id: Option<&str>) -> Result<Vec<GroupCount>> {
     let (where_clause, params) = match branch_id {
-        Some(bid) => (" WHERE branch_id = ?".to_string(), vec![mysql::Value::from(bid)]),
-        None => (String::new(), vec![]),
+        Some(bid) => (" WHERE deleted_at IS NULL AND branch_id = ?".to_string(), vec![mysql::Value::from(bid)]),
+        None => (" WHERE deleted_at IS NULL".to_string(), vec![]),
     };
     let sql = format!(
         "SELECT CAST(ram_gb AS CHAR) as label, COUNT(*) as total
@@ -778,7 +827,7 @@ pub fn listar_ativos_para_exportacao(
                         a.storage_type, a.os, a.cpu, a.model, a.year, a.notes, a.is_training, a.warranty_start, a.warranty_end, a.created_at, a.updated_at
                  FROM assets a
                  LEFT JOIN branches b ON b.id = a.branch_id
-                 WHERE a.branch_id IN ({})
+                 WHERE a.deleted_at IS NULL AND a.branch_id IN ({})
                  ORDER BY b.name ASC, a.employee_name ASC",
                 placeholders.join(", ")
             );
@@ -808,7 +857,7 @@ pub fn listar_ativos_para_exportacao(
 // ============================================================
 
 /// Atribuir equipamento do estoque a um colaborador (STOCK -> IN_USE)
-pub fn atribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<Movement> {
+pub fn atribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto, usuario: &str) -> Result<Movement> {
     let asset = obter_ativo(conn, &dto.asset_id)?;
 
     if asset.status != "STOCK" {
@@ -844,7 +893,7 @@ pub fn atribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<Mo
         "employee_name": { "from": null, "to": dto.to_employee },
         "reason": dto.reason,
     });
-    registrar_auditoria(conn, &dto.asset_id, &changes)?;
+    registrar_auditoria(conn, &dto.asset_id, &changes, usuario)?;
 
     Ok(Movement {
         id: mov_id,
@@ -861,7 +910,7 @@ pub fn atribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<Mo
 }
 
 /// Reatribuir equipamento: trocar colaborador em ativo IN_USE (ex: desligamento)
-pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<Movement> {
+pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto, usuario: &str) -> Result<Movement> {
     let asset = obter_ativo(conn, &dto.asset_id)?;
 
     if asset.status != "IN_USE" && asset.status != "STOCK" {
@@ -899,7 +948,7 @@ pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<
         "status": { "from": from_status, "to": "IN_USE" },
         "reason": dto.reason,
     });
-    registrar_auditoria(conn, &dto.asset_id, &changes)?;
+    registrar_auditoria(conn, &dto.asset_id, &changes, usuario)?;
 
     Ok(Movement {
         id: mov_id,
@@ -916,7 +965,7 @@ pub fn reatribuir_equipamento(conn: &mut PooledConn, dto: &AssignDto) -> Result<
 }
 
 /// Devolver equipamento ao estoque (IN_USE -> STOCK)
-pub fn devolver_equipamento(conn: &mut PooledConn, dto: &ReturnDto) -> Result<Movement> {
+pub fn devolver_equipamento(conn: &mut PooledConn, dto: &ReturnDto, usuario: &str) -> Result<Movement> {
     let asset = obter_ativo(conn, &dto.asset_id)?;
 
     if asset.status != "IN_USE" {
@@ -953,7 +1002,7 @@ pub fn devolver_equipamento(conn: &mut PooledConn, dto: &ReturnDto) -> Result<Mo
         "employee_name": { "from": from_employee, "to": null },
         "reason": dto.reason,
     });
-    registrar_auditoria(conn, &dto.asset_id, &changes)?;
+    registrar_auditoria(conn, &dto.asset_id, &changes, usuario)?;
 
     Ok(Movement {
         id: mov_id,
@@ -970,7 +1019,7 @@ pub fn devolver_equipamento(conn: &mut PooledConn, dto: &ReturnDto) -> Result<Mo
 }
 
 /// Trocar equipamentos entre dois colaboradores (ambos IN_USE)
-pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<Movement>> {
+pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto, usuario: &str) -> Result<Vec<Movement>> {
     let asset_a = obter_ativo(conn, &dto.asset_id_a)?;
     let asset_b = obter_ativo(conn, &dto.asset_id_b)?;
 
@@ -1036,7 +1085,7 @@ pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<M
         "swapped_with": asset_b.service_tag,
         "reason": dto.reason,
     });
-    registrar_auditoria(conn, &dto.asset_id_a, &changes_a)?;
+    registrar_auditoria(conn, &dto.asset_id_a, &changes_a, usuario)?;
 
     // Auditoria B
     let changes_b = serde_json::json!({
@@ -1045,7 +1094,7 @@ pub fn trocar_equipamentos(conn: &mut PooledConn, dto: &SwapDto) -> Result<Vec<M
         "swapped_with": asset_a.service_tag,
         "reason": dto.reason,
     });
-    registrar_auditoria(conn, &dto.asset_id_b, &changes_b)?;
+    registrar_auditoria(conn, &dto.asset_id_b, &changes_b, usuario)?;
 
     Ok(vec![
         Movement {
@@ -1362,7 +1411,7 @@ pub fn criar_colaborador(conn: &mut PooledConn, name: &str, branch_id: Option<&s
 // MANUTENÇÃO
 // ============================================================
 
-pub fn enviar_para_manutencao(conn: &mut PooledConn, dto: &SendMaintenanceDto) -> Result<MaintenanceRecord> {
+pub fn enviar_para_manutencao(conn: &mut PooledConn, dto: &SendMaintenanceDto, usuario: &str) -> Result<MaintenanceRecord> {
     // Busca ativo e valida status
     let asset = obter_ativo(conn, &dto.asset_id)?;
     if asset.status != "IN_USE" && asset.status != "STOCK" {
@@ -1388,7 +1437,7 @@ pub fn enviar_para_manutencao(conn: &mut PooledConn, dto: &SendMaintenanceDto) -
         "status": { "de": old_status, "para": "MAINTENANCE" },
         "fornecedor": dto.supplier,
     });
-    registrar_auditoria(conn, &dto.asset_id, &changes)?;
+    registrar_auditoria(conn, &dto.asset_id, &changes, usuario)?;
 
     // Cria registro de manutenção
     conn.exec_drop(
@@ -1419,7 +1468,7 @@ pub fn enviar_para_manutencao(conn: &mut PooledConn, dto: &SendMaintenanceDto) -
     })
 }
 
-pub fn retornar_de_manutencao(conn: &mut PooledConn, dto: &ReturnMaintenanceDto) -> Result<MaintenanceRecord> {
+pub fn retornar_de_manutencao(conn: &mut PooledConn, dto: &ReturnMaintenanceDto, usuario: &str) -> Result<MaintenanceRecord> {
     // Busca registro de manutenção
     let result: Option<(String, String, Option<String>, String, Option<String>, f64, String, String, Option<String>, String)> = conn
         .exec_first(
@@ -1474,7 +1523,7 @@ pub fn retornar_de_manutencao(conn: &mut PooledConn, dto: &ReturnMaintenanceDto)
         "status": { "de": "MAINTENANCE", "para": "STOCK" },
         "custo": final_cost,
     });
-    registrar_auditoria(conn, &rec.asset_id, &changes)?;
+    registrar_auditoria(conn, &rec.asset_id, &changes, usuario)?;
 
     // Fecha registro de manutenção
     conn.exec_drop(
@@ -1543,14 +1592,14 @@ pub fn listar_manutencoes(conn: &mut PooledConn, status_filter: Option<&str>) ->
 // OPERAÇÕES EM LOTE
 // ============================================================
 
-pub fn devolver_em_lote(conn: &mut PooledConn, asset_ids: &[String], reason: &str) -> Result<Vec<Movement>> {
+pub fn devolver_em_lote(conn: &mut PooledConn, asset_ids: &[String], reason: &str, usuario: &str) -> Result<Vec<Movement>> {
     let mut movimentos = Vec::new();
     for id in asset_ids {
         let dto = ReturnDto {
             asset_id: id.clone(),
             reason: reason.to_string(),
         };
-        match devolver_equipamento(conn, &dto) {
+        match devolver_equipamento(conn, &dto, usuario) {
             Ok(mov) => movimentos.push(mov),
             Err(e) => log::warn!("Falha ao devolver ativo {}: {}", id, e),
         }
@@ -1558,7 +1607,7 @@ pub fn devolver_em_lote(conn: &mut PooledConn, asset_ids: &[String], reason: &st
     Ok(movimentos)
 }
 
-pub fn baixar_em_lote(conn: &mut PooledConn, asset_ids: &[String], reason: &str) -> Result<usize> {
+pub fn baixar_em_lote(conn: &mut PooledConn, asset_ids: &[String], reason: &str, usuario: &str) -> Result<usize> {
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let mut count = 0usize;
     for id in asset_ids {
@@ -1578,7 +1627,7 @@ pub fn baixar_em_lote(conn: &mut PooledConn, asset_ids: &[String], reason: &str)
             "status": { "de": asset.status, "para": "RETIRED" },
             "motivo": reason,
         });
-        registrar_auditoria(conn, id, &changes)?;
+        registrar_auditoria(conn, id, &changes, usuario)?;
         count += 1;
     }
     Ok(count)
@@ -1594,13 +1643,12 @@ pub fn registrar_acesso(conn: &mut PooledConn) -> Result<()> {
 }
 
 // ============================================================
-// NOTEBOOKS DE TREINAMENTO
+// EQUIPAMENTOS DE TREINAMENTO
 // ============================================================
 
-/// Lista notebooks marcados como treinamento
+/// Lista equipamentos marcados como treinamento (notebooks e desktops)
 pub fn listar_notebooks_treinamento(conn: &mut PooledConn) -> Result<Vec<Asset>> {
     let filtros = AssetFilters {
-        equipment_type: Some("NOTEBOOK".to_string()),
         sort_by: Some("service_tag".to_string()),
         sort_dir: Some("ASC".to_string()),
         ..Default::default()
@@ -1610,13 +1658,9 @@ pub fn listar_notebooks_treinamento(conn: &mut PooledConn) -> Result<Vec<Asset>>
     Ok(ativos)
 }
 
-/// Marca ou desmarca um ativo como notebook de treinamento
-pub fn marcar_como_treinamento(conn: &mut PooledConn, asset_id: &str, is_training: bool) -> Result<Asset> {
+/// Marca ou desmarca um ativo como equipamento de treinamento
+pub fn marcar_como_treinamento(conn: &mut PooledConn, asset_id: &str, is_training: bool, usuario: &str) -> Result<Asset> {
     let asset = obter_ativo(conn, asset_id)?;
-
-    if asset.equipment_type != "NOTEBOOK" {
-        return Err(anyhow!("Apenas notebooks podem ser marcados como treinamento."));
-    }
 
     let val: i64 = if is_training { 1 } else { 0 };
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
@@ -1625,12 +1669,13 @@ pub fn marcar_como_treinamento(conn: &mut PooledConn, asset_id: &str, is_trainin
         "UPDATE assets SET is_training = ?, updated_at = ? WHERE id = ?",
         (val, &now, asset_id),
     )
-    .context("Falha ao marcar notebook como treinamento")?;
+    .context("Falha ao marcar equipamento como treinamento")?;
 
     registrar_auditoria(conn, asset_id, &serde_json::json!({
         "acao": if is_training { "MARCADO_TREINAMENTO" } else { "DESMARCADO_TREINAMENTO" },
         "service_tag": asset.service_tag,
-    }))?;
+        "equipment_type": asset.equipment_type,
+    }), usuario)?;
 
     obter_ativo(conn, asset_id)
 }
@@ -1676,7 +1721,7 @@ pub fn obter_tendencia_mensal(conn: &mut PooledConn, meses: i64) -> Result<Vec<T
         .exec_map(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') as period, COUNT(*) as total
              FROM assets
-             WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MONTH)
+             WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL ? MONTH)
              GROUP BY period
              ORDER BY period ASC",
             (meses,),
@@ -1697,7 +1742,8 @@ pub fn listar_alertas_garantia(conn: &mut PooledConn, dias: i64) -> Result<Vec<W
                     DATEDIFF(a.warranty_end, NOW()) as days_remaining
              FROM assets a
              LEFT JOIN branches b ON b.id = a.branch_id
-             WHERE a.warranty_end IS NOT NULL
+             WHERE a.deleted_at IS NULL
+               AND a.warranty_end IS NOT NULL
                AND a.warranty_end != ''
                AND a.status != 'RETIRED'
                AND DATEDIFF(a.warranty_end, NOW()) <= ?
@@ -1834,10 +1880,10 @@ pub fn contar_notificacoes(conn: &mut PooledConn) -> Result<NotificationCounts> 
         .unwrap_or(0);
 
     let current_year: i64 = Utc::now().format("%Y").to_string().parse().unwrap_or(2026);
-    let aging_limit = current_year - 4;
+    let aging_limit = current_year - 5;
     let aging_count: i64 = conn
         .exec_first::<i64, _, _>(
-            "SELECT COUNT(*) FROM assets WHERE year IS NOT NULL AND year <= ? AND status != 'RETIRED'",
+            "SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND year IS NOT NULL AND year <= ? AND status != 'RETIRED'",
             (aging_limit,),
         )
         .unwrap_or(Some(0))
@@ -1849,14 +1895,22 @@ pub fn contar_notificacoes(conn: &mut PooledConn) -> Result<NotificationCounts> 
     let warranty_expiring: i64 = conn
         .exec_first::<i64, _, _>(
             "SELECT COUNT(*) FROM assets
-             WHERE warranty_end IS NOT NULL AND warranty_end <= ? AND warranty_end >= ?
+             WHERE deleted_at IS NULL AND warranty_end IS NOT NULL AND warranty_end <= ? AND warranty_end >= ?
              AND status != 'RETIRED'",
             (&in_90, &today),
         )
         .unwrap_or(Some(0))
         .unwrap_or(0);
 
-    Ok(NotificationCounts { maintenance_open, aging_count, warranty_expiring })
+    let desligados_aguardando: i64 = conn
+        .exec_first::<i64, _, _>(
+            "SELECT COUNT(*) FROM desligamentos WHERE status = 'AGUARDANDO'",
+            (),
+        )
+        .unwrap_or(Some(0))
+        .unwrap_or(0);
+
+    Ok(NotificationCounts { maintenance_open, aging_count, warranty_expiring, desligados_aguardando })
 }
 
 /// Lê as últimas linhas do log do coletor automático.
@@ -1877,23 +1931,71 @@ pub fn ler_log_coletor() -> String {
 // AUTENTICAÇÃO
 // ============================================================
 
+const MAX_LOGIN_ATTEMPTS: i64 = 5;
+const LOCKOUT_MINUTES: i64 = 15;
+
+fn registrar_tentativa_login(conn: &mut PooledConn, username: &str, success: bool) -> Result<()> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let s: i64 = if success { 1 } else { 0 };
+    conn.exec_drop(
+        "INSERT INTO login_attempts (id, username, success, attempted_at) VALUES (?, ?, ?, ?)",
+        (&id, username, s, &now),
+    )?;
+    Ok(())
+}
+
+fn verificar_bloqueio_login(conn: &mut PooledConn, username: &str) -> Result<bool> {
+    let cutoff = (Utc::now() - chrono::Duration::minutes(LOCKOUT_MINUTES))
+        .format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    let failed: i64 = conn.exec_first(
+        "SELECT COUNT(*) FROM login_attempts
+         WHERE username = ? AND success = 0 AND attempted_at > ?
+         AND attempted_at > COALESCE(
+             (SELECT MAX(attempted_at) FROM login_attempts la2 WHERE la2.username = ? AND la2.success = 1),
+             '2000-01-01'
+         )",
+        (username, &cutoff, username),
+    )?.unwrap_or(0);
+
+    Ok(failed >= MAX_LOGIN_ATTEMPTS)
+}
+
 pub fn autenticar_usuario(conn: &mut PooledConn, dto: &LoginDto) -> Result<User> {
+    // Check lockout
+    let locked = verificar_bloqueio_login(conn, &dto.username)?;
+    if locked {
+        return Err(anyhow!(
+            "Conta bloqueada por {} tentativas falhas. Aguarde {} minutos.",
+            MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES
+        ));
+    }
+
     let result: Option<(String, String, String, String, String, i8, String)> = conn
         .exec_first(
             "SELECT id, username, password, name, role, active, created_at FROM users WHERE username = ? AND active = 1",
             (&dto.username,),
         )
-        .map_err(|_| anyhow!("Usuário ou senha inválidos"))?;
+        .map_err(|_| anyhow!("Usuario ou senha invalidos"))?;
 
-    let (id, username, password_hash, name, role, active, created_at) = result
-        .ok_or_else(|| anyhow!("Usuário ou senha inválidos"))?;
+    let (id, username, password_hash, name, role, active, created_at) = match result {
+        Some(r) => r,
+        None => {
+            registrar_tentativa_login(conn, &dto.username, false).ok();
+            return Err(anyhow!("Usuario ou senha invalidos"));
+        }
+    };
 
     let valid = bcrypt::verify(&dto.password, &password_hash)
         .map_err(|_| anyhow!("Erro ao verificar senha"))?;
 
     if !valid {
-        return Err(anyhow!("Usuário ou senha inválidos"));
+        registrar_tentativa_login(conn, &dto.username, false).ok();
+        return Err(anyhow!("Usuario ou senha invalidos"));
     }
+
+    registrar_tentativa_login(conn, &dto.username, true).ok();
 
     Ok(User {
         id,
@@ -2034,7 +2136,7 @@ const LOAN_SELECT: &str = "
     FROM asset_loans l
     LEFT JOIN assets a ON l.asset_id = a.id";
 
-pub fn criar_emprestimo(conn: &mut PooledConn, dto: &CreateLoanDto) -> Result<AssetLoan> {
+pub fn criar_emprestimo(conn: &mut PooledConn, dto: &CreateLoanDto, usuario: &str) -> Result<AssetLoan> {
     // Verificar se já existe empréstimo ATIVO para este ativo
     let count: u64 = conn.exec_first(
         "SELECT COUNT(*) FROM asset_loans WHERE asset_id = ? AND status = 'ATIVO'",
@@ -2073,6 +2175,13 @@ pub fn criar_emprestimo(conn: &mut PooledConn, dto: &CreateLoanDto) -> Result<As
         },
     ).context("Falha ao criar empréstimo")?;
 
+    registrar_auditoria(conn, &dto.asset_id, &serde_json::json!({
+        "acao": "EMPRESTIMO_CRIADO",
+        "tipo": dto.tipo,
+        "responsavel": dto.responsavel,
+        "destino": dto.destino,
+    }), usuario)?;
+
     let row = conn.exec_first::<mysql::Row, _, _>(
         &format!("{} WHERE l.id = ?", LOAN_SELECT), (&id,)
     )?.context("Empréstimo não encontrado após inserção")?;
@@ -2080,7 +2189,7 @@ pub fn criar_emprestimo(conn: &mut PooledConn, dto: &CreateLoanDto) -> Result<As
     Ok(row_to_loan(row))
 }
 
-pub fn devolver_emprestimo(conn: &mut PooledConn, id: &str, observacoes: Option<&str>) -> Result<AssetLoan> {
+pub fn devolver_emprestimo(conn: &mut PooledConn, id: &str, observacoes: Option<&str>, usuario: &str) -> Result<AssetLoan> {
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     let obs_update = if let Some(obs) = observacoes {
@@ -2096,6 +2205,15 @@ pub fn devolver_emprestimo(conn: &mut PooledConn, id: &str, observacoes: Option<
         ),
         (&now, &now, id),
     ).context("Falha ao registrar devolução")?;
+
+    // Busca asset_id para auditoria
+    let asset_id: Option<String> = conn
+        .exec_first("SELECT asset_id FROM asset_loans WHERE id = ?", (id,))?;
+    if let Some(ref aid) = asset_id {
+        registrar_auditoria(conn, aid, &serde_json::json!({
+            "acao": "EMPRESTIMO_DEVOLVIDO",
+        }), usuario)?;
+    }
 
     let row = conn.exec_first::<mysql::Row, _, _>(
         &format!("{} WHERE l.id = ?", LOAN_SELECT), (id,)
@@ -2205,4 +2323,427 @@ pub fn atualizar_nota(conn: &mut PooledConn, id: &str, titulo: &str, corpo: &str
 pub fn excluir_nota(conn: &mut PooledConn, id: &str) -> Result<()> {
     conn.exec_drop("DELETE FROM notes WHERE id = ?", (id,))
         .context("Falha ao excluir nota")
+}
+
+// ============================================================
+// DESCARTE DE EQUIPAMENTOS
+// ============================================================
+
+const DESCARTE_SELECT: &str =
+    "SELECT d.id, d.asset_id,
+            a.service_tag, a.model AS asset_model, b.name AS branch_name,
+            a.equipment_type, a.year,
+            d.motivo, d.destino, d.responsavel,
+            d.data_prevista, d.data_conclusao, d.status,
+            COALESCE(d.observacoes, '') AS observacoes,
+            d.registrado_por, d.created_at, d.updated_at
+     FROM descartes d
+     JOIN assets a ON d.asset_id = a.id
+     LEFT JOIN branches b ON a.branch_id = b.id";
+
+fn row_to_descarte(row: mysql::Row) -> Descarte {
+    Descarte {
+        id:             row.get("id").unwrap_or_default(),
+        asset_id:       row.get("asset_id").unwrap_or_default(),
+        service_tag:    row.get("service_tag"),
+        asset_model:    row.get("asset_model"),
+        branch_name:    row.get("branch_name"),
+        equipment_type: row.get("equipment_type"),
+        year:           row.get("year"),
+        motivo:         row.get("motivo").unwrap_or_default(),
+        destino:        row.get("destino").unwrap_or_default(),
+        responsavel:    row.get("responsavel").unwrap_or_default(),
+        data_prevista:  row.get("data_prevista"),
+        data_conclusao: row.get("data_conclusao"),
+        status:         row.get("status").unwrap_or_default(),
+        observacoes:    row.get("observacoes").unwrap_or_default(),
+        registrado_por: row.get("registrado_por"),
+        created_at:     row.get("created_at").unwrap_or_default(),
+        updated_at:     row.get("updated_at").unwrap_or_default(),
+    }
+}
+
+/// Equipamentos candidatos ao descarte: 5+ anos, não baixados, sem descarte pendente
+pub fn listar_candidatos_descarte(conn: &mut PooledConn) -> Result<Vec<Asset>> {
+    let current_year: i64 = Utc::now().format("%Y").to_string().parse().unwrap_or(2026);
+    let aging_limit = current_year - 5;
+
+    let rows: Vec<mysql::Row> = conn.exec(
+        &format!(
+            "SELECT {} FROM assets a
+             LEFT JOIN branches b ON a.branch_id = b.id
+             WHERE a.status != 'RETIRED'
+               AND a.deleted_at IS NULL
+               AND a.year IS NOT NULL
+               AND a.year <= ?
+               AND NOT EXISTS (
+                   SELECT 1 FROM descartes d
+                   WHERE d.asset_id = a.id AND d.status = 'PENDENTE'
+               )
+             ORDER BY a.year ASC, a.service_tag ASC",
+            ASSET_SELECT
+        ),
+        (aging_limit,),
+    ).context("Falha ao listar candidatos ao descarte")?;
+
+    Ok(rows.into_iter().map(row_to_asset).collect())
+}
+
+pub fn criar_descarte(conn: &mut PooledConn, dto: &CreateDescarteDto, usuario: &str) -> Result<Descarte> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "INSERT INTO descartes
+            (id, asset_id, motivo, destino, responsavel, data_prevista, status, observacoes, registrado_por, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE', ?, ?, ?, ?)",
+        (
+            &id, &dto.asset_id, &dto.motivo, &dto.destino, &dto.responsavel,
+            &dto.data_prevista,
+            dto.observacoes.as_deref().unwrap_or(""),
+            &dto.registrado_por,
+            &now, &now,
+        ),
+    ).context("Falha ao criar descarte")?;
+
+    registrar_auditoria(conn, &dto.asset_id, &serde_json::json!({
+        "acao": "DESCARTE_AGENDADO",
+        "motivo": dto.motivo,
+        "destino": dto.destino,
+        "responsavel": dto.responsavel,
+    }), usuario)?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE d.id = ?", DESCARTE_SELECT),
+        (&id,),
+    )?.context("Descarte não encontrado após inserção")?;
+
+    Ok(row_to_descarte(row))
+}
+
+pub fn listar_descartes(conn: &mut PooledConn, status: Option<&str>) -> Result<Vec<Descarte>> {
+    let (where_clause, params): (String, Vec<mysql::Value>) = match status {
+        Some(s) => (" WHERE d.status = ?".to_string(), vec![mysql::Value::from(s)]),
+        None    => (String::new(), vec![]),
+    };
+
+    let rows: Vec<mysql::Row> = conn.exec(
+        &format!("{}{} ORDER BY d.created_at DESC", DESCARTE_SELECT, where_clause),
+        mysql::Params::Positional(params),
+    ).context("Falha ao listar descartes")?;
+
+    Ok(rows.into_iter().map(row_to_descarte).collect())
+}
+
+pub fn concluir_descarte(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<Descarte> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+
+    // Busca asset_id antes de atualizar
+    let asset_id: String = conn
+        .exec_first::<String, _, _>("SELECT asset_id FROM descartes WHERE id = ?", (id,))?
+        .context("Descarte não encontrado")?;
+
+    // Marca descarte como concluído
+    conn.exec_drop(
+        "UPDATE descartes SET status = 'CONCLUIDO', data_conclusao = ?, updated_at = ? WHERE id = ?",
+        (&today, &now, id),
+    ).context("Falha ao concluir descarte")?;
+
+    // Baixa o ativo
+    conn.exec_drop(
+        "UPDATE assets SET status = 'RETIRED', updated_at = ? WHERE id = ?",
+        (&now, &asset_id),
+    ).context("Falha ao baixar ativo no descarte")?;
+
+    registrar_auditoria(conn, &asset_id, &serde_json::json!({
+        "acao": "DESCARTE_CONCLUIDO",
+        "status_anterior": "ativo",
+        "status_novo": "RETIRED",
+    }), usuario)?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE d.id = ?", DESCARTE_SELECT),
+        (id,),
+    )?.context("Descarte não encontrado após conclusão")?;
+
+    Ok(row_to_descarte(row))
+}
+
+pub fn cancelar_descarte(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<Descarte> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    // Busca asset_id para auditoria
+    let asset_id: Option<String> = conn
+        .exec_first("SELECT asset_id FROM descartes WHERE id = ?", (id,))?;
+
+    conn.exec_drop(
+        "UPDATE descartes SET status = 'CANCELADO', updated_at = ? WHERE id = ?",
+        (&now, id),
+    ).context("Falha ao cancelar descarte")?;
+
+    if let Some(ref aid) = asset_id {
+        registrar_auditoria(conn, aid, &serde_json::json!({
+            "acao": "DESCARTE_CANCELADO",
+        }), usuario)?;
+    }
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE d.id = ?", DESCARTE_SELECT),
+        (id,),
+    )?.context("Descarte não encontrado após cancelamento")?;
+
+    Ok(row_to_descarte(row))
+}
+
+// ============================================================
+// DESLIGAMENTO DE COLABORADORES
+// ============================================================
+
+const DESLIGAMENTO_SELECT: &str =
+    "SELECT d.id, d.asset_id, d.employee_name, d.service_tag,
+            d.equipment_type, d.model, d.branch_name,
+            d.data_desligamento, d.data_devolucao, d.status,
+            COALESCE(d.observacoes, '') AS observacoes,
+            d.registrado_por, d.created_at, d.updated_at
+     FROM desligamentos d";
+
+fn row_to_desligamento(row: mysql::Row) -> Desligamento {
+    // Usa Option<String> para todas as colunas e depois converte,
+    // evitando panic do row.get() quando o valor e NULL ou tipo inesperado.
+    Desligamento {
+        id:                 row.get::<Option<String>, _>("id").flatten().unwrap_or_default(),
+        asset_id:           row.get::<Option<String>, _>("asset_id").flatten().unwrap_or_default(),
+        employee_name:      row.get::<Option<String>, _>("employee_name").flatten().unwrap_or_default(),
+        service_tag:        row.get::<Option<String>, _>("service_tag").flatten(),
+        equipment_type:     row.get::<Option<String>, _>("equipment_type").flatten(),
+        model:              row.get::<Option<String>, _>("model").flatten(),
+        branch_name:        row.get::<Option<String>, _>("branch_name").flatten(),
+        data_desligamento:  row.get::<Option<String>, _>("data_desligamento").flatten().unwrap_or_default(),
+        data_devolucao:     row.get::<Option<String>, _>("data_devolucao").flatten(),
+        status:             row.get::<Option<String>, _>("status").flatten().unwrap_or_default(),
+        observacoes:        row.get::<Option<String>, _>("observacoes").flatten().unwrap_or_default(),
+        registrado_por:     row.get::<Option<String>, _>("registrado_por").flatten(),
+        created_at:         row.get::<Option<String>, _>("created_at").flatten().unwrap_or_default(),
+        updated_at:         row.get::<Option<String>, _>("updated_at").flatten().unwrap_or_default(),
+    }
+}
+
+/// Registra desligamento de colaborador — salva nome do colaborador, mantém ativo IN_USE até devolução
+pub fn desligar_colaborador(conn: &mut PooledConn, dto: &CreateDesligamentoDto, usuario: &str) -> Result<Desligamento> {
+    // Busca o ativo para capturar dados desnormalizados
+    let asset = obter_ativo(conn, &dto.asset_id)?;
+
+    if asset.status != "IN_USE" {
+        return Err(anyhow!("Somente equipamentos EM USO podem ser marcados como desligamento."));
+    }
+    let emp_name = asset.employee_name.clone().unwrap_or_default();
+    if emp_name.trim().is_empty() {
+        return Err(anyhow!("Equipamento sem colaborador atribuido."));
+    }
+
+    // Verifica se já existe desligamento AGUARDANDO para este ativo
+    let existing: Option<String> = conn.exec_first(
+        "SELECT id FROM desligamentos WHERE asset_id = ? AND status = 'AGUARDANDO'",
+        (&dto.asset_id,),
+    )?;
+    if existing.is_some() {
+        return Err(anyhow!("Ja existe um desligamento aguardando devolucao para este equipamento."));
+    }
+
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let obs = dto.observacoes.clone().unwrap_or_default();
+    let reg = dto.registrado_por.clone().unwrap_or_default();
+    let branch = asset.branch_name.clone().unwrap_or_default();
+
+    let params: Vec<mysql::Value> = vec![
+        id.clone().into(),
+        dto.asset_id.clone().into(),
+        emp_name.clone().into(),
+        asset.service_tag.clone().into(),
+        asset.equipment_type.clone().into(),
+        asset.model.clone().into(),
+        branch.into(),
+        today.into(),
+        obs.into(),
+        reg.into(),
+        now.clone().into(),
+        now.into(),
+    ];
+
+    conn.exec_drop(
+        "INSERT INTO desligamentos
+            (id, asset_id, employee_name, service_tag, equipment_type, model, branch_name,
+             data_desligamento, status, observacoes, registrado_por, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AGUARDANDO', ?, ?, ?, ?)",
+        mysql::Params::Positional(params),
+    ).context("Falha ao registrar desligamento")?;
+
+    // Registra auditoria
+    registrar_auditoria(conn, &dto.asset_id, &serde_json::json!({
+        "acao": "DESLIGAMENTO",
+        "colaborador": emp_name,
+        "service_tag": asset.service_tag,
+    }), usuario)?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE d.id = ?", DESLIGAMENTO_SELECT),
+        (&id,),
+    )?.context("Desligamento nao encontrado apos insercao")?;
+
+    Ok(row_to_desligamento(row))
+}
+
+/// Lista desligamentos com filtro opcional por status
+pub fn listar_desligamentos(conn: &mut PooledConn, status: Option<&str>) -> Result<Vec<Desligamento>> {
+    let (where_clause, params): (String, Vec<mysql::Value>) = match status {
+        Some(s) => (" WHERE d.status = ?".to_string(), vec![mysql::Value::from(s)]),
+        None    => (String::new(), vec![]),
+    };
+
+    let rows: Vec<mysql::Row> = conn.exec(
+        &format!("{}{} ORDER BY d.created_at DESC", DESLIGAMENTO_SELECT, where_clause),
+        mysql::Params::Positional(params),
+    ).context("Falha ao listar desligamentos")?;
+
+    Ok(rows.into_iter().map(row_to_desligamento).collect())
+}
+
+/// Confirma devolução do equipamento — asset vai para STOCK, employee_name limpo
+pub fn confirmar_devolucao(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<Desligamento> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+
+    // Busca dados do desligamento (usa Option para evitar panic)
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        "SELECT asset_id, employee_name, status FROM desligamentos WHERE id = ?",
+        (id,),
+    )?.context("Desligamento nao encontrado")?;
+
+    let status_atual: String = row.get::<Option<String>, _>("status").flatten().unwrap_or_default();
+    if status_atual != "AGUARDANDO" {
+        return Err(anyhow!("Este desligamento nao esta aguardando devolucao (status: {}).", status_atual));
+    }
+
+    let asset_id: String = row.get::<Option<String>, _>("asset_id").flatten().unwrap_or_default();
+    let employee_name: String = row.get::<Option<String>, _>("employee_name").flatten().unwrap_or_default();
+
+    if asset_id.is_empty() {
+        return Err(anyhow!("Registro de desligamento sem asset_id valido."));
+    }
+
+    // Marca desligamento como DEVOLVIDO
+    conn.exec_drop(
+        "UPDATE desligamentos SET status = 'DEVOLVIDO', data_devolucao = ?, updated_at = ? WHERE id = ?",
+        (&today, &now, id),
+    ).context("Falha ao confirmar devolucao")?;
+
+    // Move ativo para STOCK e limpa employee_name
+    conn.exec_drop(
+        "UPDATE assets SET status = 'STOCK', employee_name = NULL, updated_at = ? WHERE id = ?",
+        (&now, &asset_id),
+    ).context("Falha ao atualizar ativo para estoque")?;
+
+    // Registra auditoria
+    registrar_auditoria(conn, &asset_id, &serde_json::json!({
+        "acao": "DEVOLUCAO_DESLIGAMENTO",
+        "colaborador_anterior": employee_name,
+        "status_anterior": "IN_USE",
+        "status_novo": "STOCK",
+    }), usuario)?;
+
+    // Registra movimentacao
+    let mov_id = Uuid::new_v4().to_string();
+    conn.exec_drop(
+        "INSERT INTO asset_movements (id, asset_id, movement_type, from_employee, to_employee, from_status, to_status, reason, created_at)
+         VALUES (?, ?, 'RETURN', ?, NULL, 'IN_USE', 'STOCK', ?, ?)",
+        (&mov_id, &asset_id, &employee_name, "Devolucao por desligamento de colaborador", &now),
+    ).context("Falha ao registrar movimentacao")?;
+
+    let result = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE d.id = ?", DESLIGAMENTO_SELECT),
+        (id,),
+    )?.context("Desligamento nao encontrado apos confirmacao")?;
+
+    Ok(row_to_desligamento(result))
+}
+
+/// Lista desligamentos de um ativo especifico (historico do equipamento)
+pub fn listar_desligamentos_por_ativo(conn: &mut PooledConn, asset_id: &str) -> Result<Vec<Desligamento>> {
+    let rows: Vec<mysql::Row> = conn.exec(
+        &format!("{} WHERE d.asset_id = ? ORDER BY d.created_at DESC", DESLIGAMENTO_SELECT),
+        (asset_id,),
+    ).context("Falha ao listar desligamentos do ativo")?;
+
+    Ok(rows.into_iter().map(row_to_desligamento).collect())
+}
+
+/// Cancela desligamento (engano, colaborador não foi desligado)
+pub fn cancelar_desligamento(conn: &mut PooledConn, id: &str) -> Result<Desligamento> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "UPDATE desligamentos SET status = 'CANCELADO', updated_at = ? WHERE id = ?",
+        (&now, id),
+    ).context("Falha ao cancelar desligamento")?;
+
+    let row = conn.exec_first::<mysql::Row, _, _>(
+        &format!("{} WHERE d.id = ?", DESLIGAMENTO_SELECT),
+        (id,),
+    )?.context("Desligamento nao encontrado apos cancelamento")?;
+
+    Ok(row_to_desligamento(row))
+}
+
+// ============================================================
+// LIXEIRA — ativos soft-deleted
+// ============================================================
+
+pub fn listar_ativos_excluidos(conn: &mut PooledConn) -> Result<Vec<DeletedAsset>> {
+    let rows: Vec<mysql::Row> = conn.query(
+        "SELECT a.id, a.service_tag, a.equipment_type, a.employee_name,
+                b.name AS branch_name, a.model, a.deleted_at, a.deleted_by
+         FROM assets a
+         LEFT JOIN branches b ON a.branch_id = b.id
+         WHERE a.deleted_at IS NOT NULL
+         ORDER BY a.deleted_at DESC"
+    ).context("Falha ao listar ativos excluidos")?;
+
+    Ok(rows.into_iter().map(|row| DeletedAsset {
+        id:             row.get::<Option<String>, _>("id").flatten().unwrap_or_default(),
+        service_tag:    row.get::<Option<String>, _>("service_tag").flatten().unwrap_or_default(),
+        equipment_type: row.get::<Option<String>, _>("equipment_type").flatten().unwrap_or_default(),
+        employee_name:  row.get::<Option<String>, _>("employee_name").flatten(),
+        branch_name:    row.get::<Option<String>, _>("branch_name").flatten(),
+        model:          row.get::<Option<String>, _>("model").flatten().unwrap_or_default(),
+        deleted_at:     row.get::<Option<String>, _>("deleted_at").flatten().unwrap_or_default(),
+        deleted_by:     row.get::<Option<String>, _>("deleted_by").flatten().unwrap_or_default(),
+    }).collect())
+}
+
+pub fn restaurar_ativo(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<Asset> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "UPDATE assets SET deleted_at = NULL, deleted_by = NULL, status = 'STOCK', updated_at = ? WHERE id = ?",
+        (&now, id),
+    ).context("Falha ao restaurar ativo")?;
+
+    let rows = conn.affected_rows();
+    if rows == 0 {
+        return Err(anyhow!("Ativo nao encontrado na lixeira"));
+    }
+
+    registrar_auditoria(conn, id, &serde_json::json!({
+        "acao": "RESTAURADO",
+    }), usuario)?;
+
+    // Need to read without the deleted filter - use direct query
+    let sql = format!("{} WHERE a.id = ?", ASSET_SELECT);
+    let row_result: Vec<mysql::Row> = conn.exec(&sql, (id,))
+        .context("Falha ao buscar ativo restaurado")?;
+    row_result.into_iter().next().map(row_to_asset)
+        .ok_or_else(|| anyhow!("Ativo restaurado nao encontrado"))
 }

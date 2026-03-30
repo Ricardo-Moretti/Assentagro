@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Eye, Pencil, Trash2, ArrowUpDown, Monitor, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Eye, Pencil, Trash2, UserX, ArrowUpDown, Monitor, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StatusBadge, TypeBadge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/Dialog';
@@ -8,6 +8,9 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppStore } from '@/stores/useAppStore';
 import { useFilterStore } from '@/stores/useFilterStore';
 import { formatStorage } from '@/lib/utils';
+import { desligarColaborador } from '@/data/commands';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useRBAC } from '@/hooks/useRBAC';
 import type { Asset } from '@/domain/models';
 
 interface AssetTableProps {
@@ -20,13 +23,31 @@ interface AssetTableProps {
 
 const PER_PAGE = 10;
 
+/** Gera janela de paginas: 1 ... 4 5 [6] 7 8 ... 30 */
+function getPageWindow(current: number, total: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | '...')[] = [];
+  pages.push(1);
+  if (current > 3) pages.push('...');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (current < total - 2) pages.push('...');
+  pages.push(total);
+  return pages;
+}
+
 export const AssetTable: React.FC<AssetTableProps> = ({ assets, onDelete, selectedIds, onToggleSelect, onToggleAll }) => {
   const hasBatch = !!selectedIds && !!onToggleSelect && !!onToggleAll;
   const { editAsset, viewAsset } = useAppStore();
   const { filters, setFilter } = useFilterStore();
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const { isAdmin } = useRBAC();
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [desligarTarget, setDesligarTarget] = useState<Asset | null>(null);
+  const [desligando, setDesligando] = useState(false);
   const [page, setPage] = useState(1);
 
   // Reset to page 1 when assets change (filters, delete, etc.)
@@ -50,6 +71,23 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, onDelete, select
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
+    }
+  };
+
+  const handleDesligar = async () => {
+    if (!desligarTarget) return;
+    setDesligando(true);
+    try {
+      await desligarColaborador({
+        asset_id: desligarTarget.id,
+        registrado_por: user?.name ?? undefined,
+      }, user?.name ?? 'sistema');
+      toast('success', `Desligamento registrado para ${desligarTarget.employee_name}.`);
+    } catch (e) {
+      toast('error', `Falha: ${e}`);
+    } finally {
+      setDesligando(false);
+      setDesligarTarget(null);
     }
   };
 
@@ -155,12 +193,22 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, onDelete, select
                       title="Editar"
                       onClick={() => editAsset(asset.id)}
                     />
-                    <ActionButton
-                      icon={<Trash2 className="h-4 w-4" />}
-                      title="Excluir"
-                      onClick={() => setDeleteTarget(asset)}
-                      danger
-                    />
+                    {asset.status === 'IN_USE' && asset.employee_name && (
+                      <ActionButton
+                        icon={<UserX className="h-4 w-4" />}
+                        title="Desligar Colaborador"
+                        onClick={() => setDesligarTarget(asset)}
+                        danger
+                      />
+                    )}
+                    {isAdmin && (
+                      <ActionButton
+                        icon={<Trash2 className="h-4 w-4" />}
+                        title="Excluir"
+                        onClick={() => setDeleteTarget(asset)}
+                        danger
+                      />
+                    )}
                   </div>
                 </td>
               </tr>
@@ -188,21 +236,25 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, onDelete, select
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
             />
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                type="button"
-                key={p}
-                onClick={() => setPage(p)}
-                className={cn(
-                  'min-w-[32px] h-8 rounded-lg text-xs font-medium transition-colors',
-                  p === safePage
-                    ? 'bg-agro-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
-                )}
-              >
-                {p}
-              </button>
-            ))}
+            {getPageWindow(safePage, totalPages).map((p, i) =>
+              p === '...' ? (
+                <span key={`dots-${i}`} className="px-1 text-slate-400 dark:text-slate-600 text-xs">...</span>
+              ) : (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => setPage(p as number)}
+                  className={cn(
+                    'min-w-[32px] h-8 rounded-lg text-xs font-medium transition-colors',
+                    p === safePage
+                      ? 'bg-agro-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
+                  )}
+                >
+                  {p}
+                </button>
+              ),
+            )}
             <PageBtn
               icon={<ChevronRight className="h-4 w-4" />}
               title="Próxima página"
@@ -228,6 +280,17 @@ export const AssetTable: React.FC<AssetTableProps> = ({ assets, onDelete, select
         message={`Tem certeza que deseja excluir o ativo "${deleteTarget?.service_tag}"? Esta ação não pode ser desfeita.`}
         confirmLabel="Excluir"
         loading={deleting}
+      />
+
+      {/* Diálogo de confirmação de desligamento */}
+      <ConfirmDialog
+        open={!!desligarTarget}
+        onClose={() => setDesligarTarget(null)}
+        onConfirm={handleDesligar}
+        title="Desligar Colaborador"
+        message={`Registrar desligamento de "${desligarTarget?.employee_name}" do equipamento "${desligarTarget?.service_tag}"? O equipamento ficará aguardando devolução na aba Desligados.`}
+        confirmLabel="Desligar"
+        loading={desligando}
       />
     </>
   );

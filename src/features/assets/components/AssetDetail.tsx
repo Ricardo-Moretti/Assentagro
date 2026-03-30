@@ -6,19 +6,24 @@ import { SafeConfirmDialog } from '@/components/ui/Dialog';
 import { LoadingState } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { useAppStore } from '@/stores/useAppStore';
-import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos } from '@/data/commands';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useRBAC } from '@/hooks/useRBAC';
+import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo } from '@/data/commands';
 import { AttachmentManager } from './AttachmentManager';
 import { AssetTimeline } from './AssetTimeline';
 import { QRCodeLabel } from './QRCodeLabel';
 import { formatDateTime, formatStorage } from '@/lib/utils';
-import type { Asset, Movement, AssetAttachment } from '@/domain/models';
+import { UserX } from 'lucide-react';
+import type { Asset, Movement, AssetAttachment, Desligamento } from '@/domain/models';
 
 export const AssetDetail: React.FC = () => {
   const { detailAssetId, navigateTo, editAsset } = useAppStore();
   const { toast } = useToast();
+  const { isAdmin } = useRBAC();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [attachments, setAttachments] = useState<AssetAttachment[]>([]);
+  const [desligamentos, setDesligamentos] = useState<Desligamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDelete, setShowDelete] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -46,6 +51,12 @@ export const AssetDetail: React.FC = () => {
     } catch {
       setAttachments([]);
     }
+    try {
+      const d = await listarDesligamentosPorAtivo(detailAssetId);
+      setDesligamentos(d);
+    } catch {
+      setDesligamentos([]);
+    }
     setLoading(false);
   };
 
@@ -58,7 +69,9 @@ export const AssetDetail: React.FC = () => {
     if (!asset) return;
     setDeleting(true);
     try {
-      await excluirAtivo(asset.id);
+      const userName = useAuthStore.getState().user?.name ?? 'sistema';
+      const userRole = useAuthStore.getState().user?.role ?? 'user';
+      await excluirAtivo(asset.id, userName, userRole);
       toast('success', `Ativo ${asset.service_tag} excluído.`);
       navigateTo('assets-list');
     } catch (e) {
@@ -101,14 +114,16 @@ export const AssetDetail: React.FC = () => {
           >
             Editar
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            icon={<Trash2 className="h-4 w-4" />}
-            onClick={() => setShowDelete(true)}
-          >
-            Excluir
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Trash2 className="h-4 w-4" />}
+              onClick={() => setShowDelete(true)}
+            >
+              Excluir
+            </Button>
+          )}
         </div>
       </div>
 
@@ -153,6 +168,53 @@ export const AssetDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Historico de desligamentos */}
+      {desligamentos.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-orange-200 dark:border-orange-800/40 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <UserX className="h-4 w-4 text-orange-600" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Historico de Colaboradores Desligados
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {desligamentos.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center gap-3 p-3 rounded-xl bg-orange-50/50 dark:bg-orange-950/10 border border-orange-100 dark:border-orange-900/30"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {d.employee_name}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Desligado em {new Date(d.data_desligamento).toLocaleDateString('pt-BR')}
+                    {d.status === 'DEVOLVIDO' && d.data_devolucao && (
+                      <> {' \u2014 '} Equipamento devolvido em {new Date(d.data_devolucao).toLocaleDateString('pt-BR')}</>
+                    )}
+                    {d.status === 'AGUARDANDO' && (
+                      <> {' \u2014 '} <span className="text-orange-600 dark:text-orange-400 font-medium">Aguardando devolucao</span></>
+                    )}
+                    {d.status === 'CANCELADO' && (
+                      <> {' \u2014 '} <span className="text-slate-400">Cancelado</span></>
+                    )}
+                  </p>
+                </div>
+                <span className={
+                  d.status === 'DEVOLVIDO'
+                    ? 'text-[10px] px-2 py-0.5 rounded-full font-medium text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30'
+                    : d.status === 'AGUARDANDO'
+                    ? 'text-[10px] px-2 py-0.5 rounded-full font-medium text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/30'
+                    : 'text-[10px] px-2 py-0.5 rounded-full font-medium text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800'
+                }>
+                  {d.status === 'DEVOLVIDO' ? 'Devolvido' : d.status === 'AGUARDANDO' ? 'Aguardando' : 'Cancelado'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Timeline unificada */}
       <AssetTimeline assetId={asset.id} movements={movements} />

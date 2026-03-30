@@ -9,6 +9,7 @@ import {
   MonitorSpeaker,
   AlertTriangle,
   Filter,
+  GraduationCap,
 } from 'lucide-react';
 import {
   PieChart,
@@ -31,6 +32,7 @@ import { RecentMovements } from '../components/RecentMovements';
 import { AgingAlerts } from '../components/AgingAlerts';
 import { WarrantyAlerts } from '../components/WarrantyAlerts';
 import { AcquisitionTrend } from '../components/AcquisitionTrend';
+import { AssetQuickViewModal } from '../components/AssetQuickViewModal';
 import { LoadingState } from '@/components/ui/Spinner';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAppStore } from '@/stores/useAppStore';
@@ -44,6 +46,7 @@ const CHART_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#e
 
 export const DashboardPage: React.FC = () => {
   const [dashBranch, setDashBranch] = useState<string | undefined>(undefined);
+  const [quickViewId, setQuickViewId] = useState<string | null>(null);
   const { data, isLoading } = useDashboardData(dashBranch);
   const { navigateTo } = useAppStore();
   const { setFilters, resetFilters } = useFilterStore();
@@ -96,6 +99,7 @@ export const DashboardPage: React.FC = () => {
         </select>
         {dashBranch && (
           <button
+            type="button"
             onClick={() => setDashBranch(undefined)}
             className="text-xs text-agro-600 hover:underline"
           >
@@ -156,6 +160,12 @@ export const DashboardPage: React.FC = () => {
           icon={<MonitorSpeaker className="h-6 w-6 text-orange-600" />}
           color="bg-orange-100 dark:bg-orange-900/30"
         />
+        <StatCard
+          label="Treinamento"
+          value={stats.training ?? 0}
+          icon={<GraduationCap className="h-6 w-6 text-violet-600" />}
+          color="bg-violet-100 dark:bg-violet-900/30"
+        />
         {stats.in_use_no_employee > 0 && (
           <StatCard
             label="Em Uso s/ Colaborador"
@@ -166,17 +176,39 @@ export const DashboardPage: React.FC = () => {
         )}
       </div>
 
+      {/* Metricas de Gestao */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          icon={<Wrench className="h-6 w-6 text-amber-600" />}
+          label="Custo Total Manutencao"
+          value={`R$ ${stats.maintenance_total_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          color="bg-amber-100 dark:bg-amber-900/30"
+        />
+        <StatCard
+          icon={<Package className="h-6 w-6 text-orange-600" />}
+          label="Tempo Medio Manutencao"
+          value={`${stats.avg_maintenance_days.toFixed(0)} dias`}
+          color="bg-orange-100 dark:bg-orange-900/30"
+        />
+        <StatCard
+          icon={<Monitor className="h-6 w-6 text-indigo-600" />}
+          label="Ativos por Colaborador"
+          value={stats.assets_per_employee.toFixed(1)}
+          color="bg-indigo-100 dark:bg-indigo-900/30"
+        />
+      </div>
+
       {/* Alertas de garantia a vencer */}
       <WarrantyAlerts />
 
       {/* Alertas de envelhecimento */}
-      <AgingAlerts />
+      <AgingAlerts onSelect={setQuickViewId} />
 
       {/* Ranking por filial */}
       <BranchRanking data={data.by_branch} onBranchClick={handleBranchDrill} />
 
       {/* Ano de Máquina por Filial */}
-      <YearBranchGrid />
+      <YearBranchGrid onSelect={setQuickViewId} />
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -321,7 +353,13 @@ export const DashboardPage: React.FC = () => {
       <AcquisitionTrend data={data.by_month} />
 
       {/* Movimentações recentes */}
-      <RecentMovements />
+      <RecentMovements onSelect={setQuickViewId} />
+
+      {/* Quick view modal — abre sem sair do dashboard */}
+      <AssetQuickViewModal
+        assetId={quickViewId}
+        onClose={() => setQuickViewId(null)}
+      />
     </div>
   );
 };

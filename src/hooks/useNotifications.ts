@@ -9,6 +9,7 @@ export function useNotifications() {
     maintenance_open: 0,
     aging_count: 0,
     warranty_expiring: 0,
+    desligados_aguardando: 0,
   });
 
   const refresh = useCallback(async () => {

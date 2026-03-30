@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { CreateAssetDto, Asset } from '@/domain/models';
 import { validateAsset, type ValidationError } from '@/domain/validators';
 import * as api from '@/data/commands';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 type FormState = Partial<CreateAssetDto>;
 export type TagStatus = 'idle' | 'checking' | 'available' | 'taken';
@@ -105,10 +106,11 @@ export function useAssetForm(initial?: Asset) {
     setErrors([]);
     try {
       const dto = form as CreateAssetDto;
+      const userName = useAuthStore.getState().user?.name ?? 'sistema';
       if (initial?.id) {
-        return await api.atualizarAtivo(initial.id, dto);
+        return await api.atualizarAtivo(initial.id, dto, userName);
       } else {
-        return await api.criarAtivo(dto);
+        return await api.criarAtivo(dto, userName);
       }
     } catch (e) {
       const msg = String(e);

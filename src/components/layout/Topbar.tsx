@@ -18,12 +18,15 @@ const VIEW_TITLES: Record<AppView, string> = {
   import: 'Importar Dados',
   movements: 'Movimentações',
   audit: 'Auditoria',
-  training: 'Notebooks de Treinamento',
+  training: 'Equipamentos de Treinamento',
   loans: 'Empréstimos e Retiradas',
   notes: 'Observações',
   users: 'Gerenciar Usuários',
   settings: 'Configurações',
   help: 'Ajuda',
+  disposal: 'Descarte de Equipamentos',
+  desligados: 'Colaboradores Desligados',
+  trash: 'Lixeira',
 };
 
 export const Topbar: React.FC = () => {

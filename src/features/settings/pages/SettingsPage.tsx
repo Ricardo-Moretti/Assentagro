@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/useThemeStore';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
 import { criarBackup, restaurarBackup, obterConfiguracao, lerLogColetor } from '@/data/commands';
+import { useRBAC } from '@/hooks/useRBAC';
 import type { Theme } from '@/domain/models';
 
 const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
@@ -18,6 +19,7 @@ const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
 export const SettingsPage: React.FC = () => {
   const { theme, setTheme } = useThemeStore();
   const { toast } = useToast();
+  const { role } = useRBAC();
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export const SettingsPage: React.FC = () => {
       if (!destino) return;
 
       setBackingUp(true);
-      const path = await criarBackup(destino);
+      const path = await criarBackup(destino, role);
       toast('success', `Backup salvo em: ${path.split(/[/\\]/).pop()}`);
     } catch (e) {
       toast('error', `Falha ao criar backup: ${e}`);
@@ -73,7 +75,7 @@ export const SettingsPage: React.FC = () => {
       const filePath = typeof origem === 'string' ? origem : origem;
 
       setRestoring(true);
-      await restaurarBackup(filePath);
+      await restaurarBackup(filePath, role);
       toast('success', 'Banco restaurado com sucesso! Reinicie o aplicativo para garantir consistência.');
     } catch (e) {
       toast('error', `Falha ao restaurar: ${e}`);

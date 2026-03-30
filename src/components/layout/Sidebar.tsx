@@ -15,10 +15,14 @@ import {
   Settings,
   HelpCircle,
   Tractor,
+  Trash2,
+  UserX,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/useAppStore';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useRBAC } from '@/hooks/useRBAC';
 import type { AppView } from '@/domain/models';
 
 interface NavItem {
@@ -39,6 +43,9 @@ const navItems: NavItem[] = [
   { view: 'training', label: 'Treinamento', icon: <GraduationCap className="h-5 w-5" /> },
   { view: 'loans', label: 'Empréstimos', icon: <ArrowRightLeft className="h-5 w-5" /> },
   { view: 'notes', label: 'Observações', icon: <StickyNote className="h-5 w-5" /> },
+  { view: 'desligados', label: 'Desligados', icon: <UserX className="h-5 w-5" /> },
+  { view: 'disposal', label: 'Descarte', icon: <Trash2 className="h-5 w-5" /> },
+  { view: 'trash', label: 'Lixeira', icon: <RotateCcw className="h-5 w-5" /> },
   { view: 'users', label: 'Usuários', icon: <Users className="h-5 w-5" /> },
 ];
 
@@ -50,9 +57,13 @@ const bottomItems: NavItem[] = [
 export const Sidebar: React.FC = () => {
   const { currentView, navigateTo } = useAppStore();
   const notifications = useNotifications();
+  const { isAdmin } = useRBAC();
+
+  // Filtra itens restritos a admin
+  const visibleItems = isAdmin ? navItems : navItems.filter((item) => item.view !== 'users' && item.view !== 'trash');
 
   // Injeta badges nos items
-  const itemsWithBadges = navItems.map((item) => {
+  const itemsWithBadges = visibleItems.map((item) => {
     if (item.view === 'movements' && notifications.maintenance_open > 0) {
       return { ...item, badge: notifications.maintenance_open };
     }
@@ -61,6 +72,9 @@ export const Sidebar: React.FC = () => {
     }
     if (item.view === 'assets-list' && notifications.warranty_expiring > 0) {
       return { ...item, badge: notifications.warranty_expiring };
+    }
+    if (item.view === 'desligados' && notifications.desligados_aguardando > 0) {
+      return { ...item, badge: notifications.desligados_aguardando };
     }
     return item;
   });
@@ -80,7 +94,7 @@ export const Sidebar: React.FC = () => {
         </div>
         <div>
           <h1 className="text-base font-bold text-white tracking-wide">
-            AssetAgro
+            Controle de Ativos
           </h1>
           <p className="text-[10px] text-gold-300 leading-tight font-medium">
             Tracbel Agro — TI

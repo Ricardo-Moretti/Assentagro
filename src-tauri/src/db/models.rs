@@ -34,6 +34,18 @@ pub struct Asset {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeletedAsset {
+    pub id: String,
+    pub service_tag: String,
+    pub equipment_type: String,
+    pub employee_name: Option<String>,
+    pub branch_name: Option<String>,
+    pub model: String,
+    pub deleted_at: String,
+    pub deleted_by: String,
+}
+
 // ============================================================
 // DTOs (enviados pelo frontend)
 // ============================================================
@@ -103,6 +115,10 @@ pub struct DashboardStats {
     pub notebooks: i64,
     pub desktops: i64,
     pub in_use_no_employee: i64,
+    pub training: i64,
+    pub maintenance_total_cost: f64,
+    pub avg_maintenance_days: f64,
+    pub assets_per_employee: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,6 +164,7 @@ pub struct AuditEntry {
     pub asset_id: String,
     pub changed_at: String,
     pub changes_json: String,
+    pub changed_by: Option<String>,
 }
 
 // ============================================================
@@ -266,7 +283,8 @@ pub struct WarrantyAlert {
 pub struct NotificationCounts {
     pub maintenance_open: i64,
     pub aging_count: i64,
-    pub warranty_expiring: i64, // garantias a vencer em 90 dias
+    pub warranty_expiring: i64,
+    pub desligados_aguardando: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -348,6 +366,73 @@ pub struct CreateLoanDto {
     pub data_saida: String,
     pub previsao_retorno: Option<String>,
     pub observacoes: Option<String>,
+    pub registrado_por: Option<String>,
+}
+
+// ============================================================
+// Descarte de equipamentos
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Descarte {
+    pub id: String,
+    pub asset_id: String,
+    pub service_tag: Option<String>,
+    pub asset_model: Option<String>,
+    pub branch_name: Option<String>,
+    pub equipment_type: Option<String>,
+    pub year: Option<i64>,
+    pub motivo: String,       // OBSOLESCENCIA | DEFEITO_IRREPARAVEL | FURTO | PERDA | DOACAO | VENDA | OUTRO
+    pub destino: String,
+    pub responsavel: String,
+    pub data_prevista: Option<String>,
+    pub data_conclusao: Option<String>,
+    pub status: String,       // PENDENTE | CONCLUIDO | CANCELADO
+    pub observacoes: String,
+    pub registrado_por: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateDescarteDto {
+    pub asset_id: String,
+    pub motivo: String,
+    pub destino: String,
+    pub responsavel: String,
+    pub data_prevista: Option<String>,
+    pub observacoes: Option<String>,
+    pub registrado_por: Option<String>,
+}
+
+// ============================================================
+// Desligamento de colaboradores
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Desligamento {
+    pub id: String,
+    pub asset_id: String,
+    pub employee_name: String,
+    pub service_tag: Option<String>,
+    pub equipment_type: Option<String>,
+    pub model: Option<String>,
+    pub branch_name: Option<String>,
+    pub data_desligamento: String,
+    pub data_devolucao: Option<String>,
+    pub status: String,        // AGUARDANDO | DEVOLVIDO | CANCELADO
+    pub observacoes: String,
+    pub registrado_por: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct CreateDesligamentoDto {
+    pub asset_id: String,
+    #[serde(default)]
+    pub observacoes: Option<String>,
+    #[serde(default)]
     pub registrado_por: Option<String>,
 }
 

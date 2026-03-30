@@ -7,6 +7,7 @@ import {
   devolverEquipamento,
   trocarEquipamentos,
 } from '@/data/commands';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { Movement, Asset, AssignDto, ReturnDto, SwapDto } from '@/domain/models';
 
 export function useMovements() {
@@ -38,19 +39,22 @@ export function useMovements() {
   }, [refresh]);
 
   const assign = async (dto: AssignDto) => {
-    const result = await atribuirEquipamento(dto);
+    const userName = useAuthStore.getState().user?.name ?? 'sistema';
+    const result = await atribuirEquipamento(dto, userName);
     await refresh();
     return result;
   };
 
   const returnAsset = async (dto: ReturnDto) => {
-    const result = await devolverEquipamento(dto);
+    const userName = useAuthStore.getState().user?.name ?? 'sistema';
+    const result = await devolverEquipamento(dto, userName);
     await refresh();
     return result;
   };
 
   const swap = async (dto: SwapDto) => {
-    const result = await trocarEquipamentos(dto);
+    const userName = useAuthStore.getState().user?.name ?? 'sistema';
+    const result = await trocarEquipamentos(dto, userName);
     await refresh();
     return result;
   };

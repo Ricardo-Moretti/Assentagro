@@ -3,6 +3,7 @@ import { CornerDownLeft, XCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog, SafeConfirmDialog } from '@/components/ui/Dialog';
 import { useToast } from '@/components/ui/Toast';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { devolverEmLote, baixarEmLote } from '@/data/commands';
 
 interface BatchActionBarProps {
@@ -25,10 +26,13 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
 
   if (selectedCount === 0) return null;
 
+  const userName = useAuthStore((s) => s.user?.name) ?? 'sistema';
+  const userRole = useAuthStore((s) => s.user?.role) ?? 'user';
+
   const handleBatchReturn = async () => {
     setLoading(true);
     try {
-      const movs = await devolverEmLote(selectedIds, 'Devolução em lote');
+      const movs = await devolverEmLote(selectedIds, 'Devolução em lote', userName);
       toast('success', `${movs.length} equipamento(s) devolvido(s) ao estoque.`);
       onClear();
       onDone();
@@ -43,7 +47,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
   const handleBatchRetire = async () => {
     setLoading(true);
     try {
-      const count = await baixarEmLote(selectedIds, 'Baixa em lote');
+      const count = await baixarEmLote(selectedIds, 'Baixa em lote', userName, userRole);
       toast('success', `${count} equipamento(s) baixado(s).`);
       onClear();
       onDone();

@@ -33,6 +33,11 @@ import type {
   CreateLoanDto,
   Nota,
   CreateNotaDto,
+  Descarte,
+  CreateDescarteDto,
+  Desligamento,
+  CreateDesligamentoDto,
+  DeletedAsset,
 } from '@/domain/models';
 
 // Filiais
@@ -46,14 +51,14 @@ export const listarAtivos = (filtros?: AssetFilters): Promise<Asset[]> =>
 export const obterAtivo = (id: string): Promise<Asset> =>
   invoke('obter_ativo', { id });
 
-export const criarAtivo = (dados: CreateAssetDto): Promise<Asset> =>
-  invoke('criar_ativo', { dados });
+export const criarAtivo = (dados: CreateAssetDto, usuario: string): Promise<Asset> =>
+  invoke('criar_ativo', { dados, usuario });
 
-export const atualizarAtivo = (id: string, dados: UpdateAssetDto): Promise<Asset> =>
-  invoke('atualizar_ativo', { id, dados });
+export const atualizarAtivo = (id: string, dados: UpdateAssetDto, usuario: string): Promise<Asset> =>
+  invoke('atualizar_ativo', { id, dados, usuario });
 
-export const excluirAtivo = (id: string): Promise<void> =>
-  invoke('excluir_ativo', { id });
+export const excluirAtivo = (id: string, usuario: string, role: string): Promise<void> =>
+  invoke('excluir_ativo', { id, usuario, role });
 
 // Dashboard
 export const obterDadosDashboard = (branch_id?: string): Promise<DashboardData> =>
@@ -73,28 +78,30 @@ export const listarAuditoria = (asset_id?: string): Promise<AuditEntry[]> =>
 export const importarAtivos = (
   ativos: CreateAssetDto[],
   modo: 'update' | 'skip',
+  usuario: string,
+  role: string,
 ): Promise<ImportResult> =>
-  invoke('importar_ativos', { ativos, modo });
+  invoke('importar_ativos', { ativos, modo, usuario, role });
 
 // Backup / Restore
-export const criarBackup = (destino: string): Promise<string> =>
-  invoke('criar_backup', { destino });
+export const criarBackup = (destino: string, role: string): Promise<string> =>
+  invoke('criar_backup', { destino, role });
 
-export const restaurarBackup = (origem: string): Promise<void> =>
-  invoke('restaurar_backup', { origem });
+export const restaurarBackup = (origem: string, role: string): Promise<void> =>
+  invoke('restaurar_backup', { origem, role });
 
 // Movimentações
-export const atribuirEquipamento = (dados: AssignDto): Promise<Movement> =>
-  invoke('atribuir_equipamento', { dados });
+export const atribuirEquipamento = (dados: AssignDto, usuario: string): Promise<Movement> =>
+  invoke('atribuir_equipamento', { dados, usuario });
 
-export const reatribuirEquipamento = (dados: AssignDto): Promise<Movement> =>
-  invoke('reatribuir_equipamento', { dados });
+export const reatribuirEquipamento = (dados: AssignDto, usuario: string): Promise<Movement> =>
+  invoke('reatribuir_equipamento', { dados, usuario });
 
-export const devolverEquipamento = (dados: ReturnDto): Promise<Movement> =>
-  invoke('devolver_equipamento', { dados });
+export const devolverEquipamento = (dados: ReturnDto, usuario: string): Promise<Movement> =>
+  invoke('devolver_equipamento', { dados, usuario });
 
-export const trocarEquipamentos = (dados: SwapDto): Promise<Movement[]> =>
-  invoke('trocar_equipamentos', { dados });
+export const trocarEquipamentos = (dados: SwapDto, usuario: string): Promise<Movement[]> =>
+  invoke('trocar_equipamentos', { dados, usuario });
 
 export const listarMovimentos = (limit?: number): Promise<Movement[]> =>
   invoke('listar_movimentos', { limit: limit ?? null });
@@ -135,13 +142,15 @@ export const criarColaborador = (
 // Manutenção
 export const enviarParaManutencao = (
   dados: SendMaintenanceDto,
+  usuario: string,
 ): Promise<MaintenanceRecord> =>
-  invoke('enviar_para_manutencao', { dados });
+  invoke('enviar_para_manutencao', { dados, usuario });
 
 export const retornarDeManutencao = (
   dados: ReturnMaintenanceDto,
+  usuario: string,
 ): Promise<MaintenanceRecord> =>
-  invoke('retornar_de_manutencao', { dados });
+  invoke('retornar_de_manutencao', { dados, usuario });
 
 export const listarManutencoes = (
   status_filter?: string,
@@ -152,14 +161,17 @@ export const listarManutencoes = (
 export const devolverEmLote = (
   asset_ids: string[],
   reason: string,
+  usuario: string,
 ): Promise<Movement[]> =>
-  invoke('devolver_em_lote', { asset_ids, reason });
+  invoke('devolver_em_lote', { asset_ids, reason, usuario });
 
 export const baixarEmLote = (
   asset_ids: string[],
   reason: string,
+  usuario: string,
+  role: string,
 ): Promise<number> =>
-  invoke('baixar_em_lote', { asset_ids, reason });
+  invoke('baixar_em_lote', { asset_ids, reason, usuario, role });
 
 // Log de acesso
 export const registrarAcesso = (): Promise<void> =>
@@ -172,8 +184,9 @@ export const listarNotebooksTreinamento = (): Promise<Asset[]> =>
 export const marcarComoTreinamento = (
   asset_id: string,
   is_training: boolean,
+  usuario: string,
 ): Promise<Asset> =>
-  invoke('marcar_como_treinamento', { asset_id, is_training });
+  invoke('marcar_como_treinamento', { asset_id, is_training, usuario });
 
 // Validação de Service Tag
 export const verificarServiceTag = (
@@ -217,17 +230,17 @@ export const lerLogColetor = (): Promise<string> =>
 export const autenticarUsuario = (dados: LoginDto): Promise<User> =>
   invoke('autenticar_usuario', { dados });
 
-export const criarUsuario = (dados: CreateUserDto): Promise<User> =>
-  invoke('criar_usuario', { dados });
+export const criarUsuario = (dados: CreateUserDto, role: string): Promise<User> =>
+  invoke('criar_usuario', { dados, role });
 
 export const listarUsuarios = (): Promise<User[]> =>
   invoke('listar_usuarios');
 
-export const alterarSenha = (dados: ChangePasswordDto): Promise<void> =>
-  invoke('alterar_senha', { dados });
+export const alterarSenha = (dados: ChangePasswordDto, role: string): Promise<void> =>
+  invoke('alterar_senha', { dados, role });
 
-export const desativarUsuario = (id: string): Promise<void> =>
-  invoke('desativar_usuario', { id });
+export const desativarUsuario = (id: string, role: string): Promise<void> =>
+  invoke('desativar_usuario', { id, role });
 
 // Utilitário — escrita de arquivo binário
 export const escreverArquivo = (caminho: string, dados: number[]): Promise<void> =>
@@ -238,14 +251,15 @@ export const verificarConexao = (): Promise<boolean> =>
   invoke('verificar_conexao');
 
 // Empréstimos
-export const criarEmprestimo = (dados: CreateLoanDto): Promise<AssetLoan> =>
-  invoke('criar_emprestimo', { dados });
+export const criarEmprestimo = (dados: CreateLoanDto, usuario: string): Promise<AssetLoan> =>
+  invoke('criar_emprestimo', { dados, usuario });
 
 export const devolverEmprestimo = (
   id: string,
-  observacoes?: string,
+  observacoes: string | undefined,
+  usuario: string,
 ): Promise<AssetLoan> =>
-  invoke('devolver_emprestimo', { id, observacoes: observacoes ?? null });
+  invoke('devolver_emprestimo', { id, observacoes: observacoes ?? null, usuario });
 
 export const listarEmprestimos = (
   status_filter?: string,
@@ -276,3 +290,42 @@ export const atualizarNota = (
 
 export const excluirNota = (id: string): Promise<void> =>
   invoke('excluir_nota', { id });
+
+// Descarte de equipamentos
+export const listarCandidatosDescarte = (): Promise<Asset[]> =>
+  invoke('listar_candidatos_descarte');
+
+export const criarDescarte = (dados: CreateDescarteDto, usuario: string): Promise<Descarte> =>
+  invoke('criar_descarte', { dados, usuario });
+
+export const listarDescartes = (status?: string): Promise<Descarte[]> =>
+  invoke('listar_descartes', { status: status ?? null });
+
+export const concluirDescarte = (id: string, usuario: string): Promise<Descarte> =>
+  invoke('concluir_descarte', { id, usuario });
+
+export const cancelarDescarte = (id: string, usuario: string): Promise<Descarte> =>
+  invoke('cancelar_descarte', { id, usuario });
+
+// Desligamento de colaboradores
+export const desligarColaborador = (dados: CreateDesligamentoDto, usuario: string): Promise<Desligamento> =>
+  invoke('desligar_colaborador', { dados, usuario });
+
+export const listarDesligamentos = (status?: string): Promise<Desligamento[]> =>
+  invoke('listar_desligamentos', { status: status ?? null });
+
+export const listarDesligamentosPorAtivo = (assetId: string): Promise<Desligamento[]> =>
+  invoke('listar_desligamentos_por_ativo', { asset_id: assetId });
+
+export const confirmarDevolucao = (id: string, usuario: string): Promise<Desligamento> =>
+  invoke('confirmar_devolucao', { id, usuario });
+
+export const cancelarDesligamento = (id: string): Promise<Desligamento> =>
+  invoke('cancelar_desligamento', { id });
+
+// Lixeira
+export const listarAtivosExcluidos = (): Promise<DeletedAsset[]> =>
+  invoke('listar_ativos_excluidos');
+
+export const restaurarAtivo = (id: string, usuario: string, role: string): Promise<Asset> =>
+  invoke('restaurar_ativo', { id, usuario, role });

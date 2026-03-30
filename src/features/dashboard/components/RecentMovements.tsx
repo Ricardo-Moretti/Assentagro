@@ -3,7 +3,6 @@ import { UserPlus, CornerDownLeft, ArrowLeftRight, Activity } from 'lucide-react
 import { cn, formatDateTime } from '@/lib/utils';
 import { MOVEMENT_TYPE_LABEL } from '@/domain/constants';
 import { listarMovimentos } from '@/data/commands';
-import { useAppStore } from '@/stores/useAppStore';
 import type { Movement, MovementType } from '@/domain/models';
 
 const TYPE_CONFIG: Record<MovementType, { icon: React.ReactNode; color: string; bg: string }> = {
@@ -24,10 +23,13 @@ const TYPE_CONFIG: Record<MovementType, { icon: React.ReactNode; color: string; 
   },
 };
 
-export const RecentMovements: React.FC = () => {
+interface Props {
+  onSelect?: (id: string) => void;
+}
+
+export const RecentMovements: React.FC<Props> = ({ onSelect }) => {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
-  const { viewAsset } = useAppStore();
 
   useEffect(() => {
     listarMovimentos(5).then(setMovements).finally(() => setLoading(false));
@@ -57,7 +59,7 @@ export const RecentMovements: React.FC = () => {
             <button
               type="button"
               key={mov.id}
-              onClick={() => viewAsset(mov.asset_id)}
+              onClick={() => onSelect?.(mov.asset_id)}
               className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left group"
             >
               <div className={cn('flex items-center justify-center h-7 w-7 rounded-md flex-shrink-0', config.bg, config.color)}>

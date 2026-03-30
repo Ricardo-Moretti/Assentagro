@@ -25,7 +25,10 @@ export type AppView =
   | 'notes'
   | 'users'
   | 'settings'
-  | 'help';
+  | 'help'
+  | 'disposal'
+  | 'desligados'
+  | 'trash';
 
 export interface Branch {
   id: string;
@@ -53,6 +56,17 @@ export interface Asset {
   warranty_end: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DeletedAsset {
+  id: string;
+  service_tag: string;
+  equipment_type: string;
+  employee_name: string | null;
+  branch_name: string | null;
+  model: string;
+  deleted_at: string;
+  deleted_by: string;
 }
 
 export interface CreateAssetDto {
@@ -97,6 +111,10 @@ export interface DashboardStats {
   notebooks: number;
   desktops: number;
   in_use_no_employee: number;
+  training: number;
+  maintenance_total_cost: number;
+  avg_maintenance_days: number;
+  assets_per_employee: number;
 }
 
 export interface BranchCount {
@@ -134,6 +152,7 @@ export interface AuditEntry {
   asset_id: string;
   changed_at: string;
   changes_json: string;
+  changed_by?: string | null;
 }
 
 // Movimentações
@@ -236,7 +255,8 @@ export interface WarrantyAlert {
 export interface NotificationCounts {
   maintenance_open: number;
   aging_count: number;
-  warranty_expiring: number; // garantias a vencer em 90 dias
+  warranty_expiring: number;
+  desligados_aguardando: number;
 }
 
 // Custos de manutenção
@@ -308,6 +328,74 @@ export interface CreateLoanDto {
   destino_branch_id?: string;
   data_saida: string;
   previsao_retorno?: string;
+  observacoes?: string;
+  registrado_por?: string;
+}
+
+// Desligamento de colaboradores
+export type DesligamentoStatus = 'AGUARDANDO' | 'DEVOLVIDO' | 'CANCELADO';
+
+export interface Desligamento {
+  id: string;
+  asset_id: string;
+  employee_name: string;
+  service_tag: string | null;
+  equipment_type: string | null;
+  model: string | null;
+  branch_name: string | null;
+  data_desligamento: string;
+  data_devolucao: string | null;
+  status: DesligamentoStatus;
+  observacoes: string;
+  registrado_por: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDesligamentoDto {
+  asset_id: string;
+  observacoes?: string;
+  registrado_por?: string;
+}
+
+// Descarte
+export type DescarteMotivo =
+  | 'OBSOLESCENCIA'
+  | 'DEFEITO_IRREPARAVEL'
+  | 'FURTO'
+  | 'PERDA'
+  | 'DOACAO'
+  | 'VENDA'
+  | 'OUTRO';
+
+export type DescarteStatus = 'PENDENTE' | 'CONCLUIDO' | 'CANCELADO';
+
+export interface Descarte {
+  id: string;
+  asset_id: string;
+  service_tag: string | null;
+  asset_model: string | null;
+  branch_name: string | null;
+  equipment_type: string | null;
+  year: number | null;
+  motivo: DescarteMotivo;
+  destino: string;
+  responsavel: string;
+  data_prevista: string | null;
+  data_conclusao: string | null;
+  status: DescarteStatus;
+  observacoes: string;
+  registrado_por: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDescarteDto {
+  asset_id: string;
+  motivo: DescarteMotivo;
+  destino: string;
+  responsavel: string;
+  data_prevista?: string;
   observacoes?: string;
   registrado_por?: string;
 }

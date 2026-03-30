@@ -1,11 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, ShieldCheck, User as UserIcon, XCircle } from 'lucide-react';
+import { UserPlus, ShieldCheck, User as UserIcon, XCircle, ShieldAlert } from 'lucide-react';
 import { listarUsuarios, criarUsuario, desativarUsuario } from '@/data/commands';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { useRBAC } from '@/hooks/useRBAC';
 import type { User, CreateUserDto } from '@/domain/models';
 
 export const UsersPage: React.FC = () => {
+  const { isAdmin, role } = useRBAC();
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-20 space-y-4">
+        <ShieldAlert className="h-12 w-12 text-slate-400" />
+        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">
+          Acesso restrito
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Somente administradores podem gerenciar usuarios.
+        </p>
+      </div>
+    );
+  }
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -46,7 +62,7 @@ export const UsersPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await criarUsuario(form);
+      await criarUsuario(form, role);
       setForm({ username: '', password: '', name: '', role: 'user' });
       setShowForm(false);
       await fetchUsers();
@@ -60,7 +76,7 @@ export const UsersPage: React.FC = () => {
   const handleDeactivate = async (id: string) => {
     if (!confirm('Deseja realmente desativar este usuário?')) return;
     try {
-      await desativarUsuario(id);
+      await desativarUsuario(id, role);
       await fetchUsers();
     } catch (err) {
       console.error('Erro ao desativar usuário:', err);

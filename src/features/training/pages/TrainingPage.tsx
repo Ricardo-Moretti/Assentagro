@@ -10,6 +10,7 @@ import {
   marcarComoTreinamento,
   listarAtivos,
 } from '@/data/commands';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { BRANCHES } from '@/domain/constants';
 import type { Asset, AssetFilters } from '@/domain/models';
 
@@ -33,6 +34,7 @@ export const TrainingPage: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const { toast } = useToast();
   const { viewAsset } = useAppStore();
+  const userName = useAuthStore((s) => s.user?.name) ?? 'sistema';
 
   const loadTraining = useCallback(async () => {
     try {
@@ -51,7 +53,7 @@ export const TrainingPage: React.FC = () => {
 
   const handleRemove = async (asset: Asset) => {
     try {
-      await marcarComoTreinamento(asset.id, false);
+      await marcarComoTreinamento(asset.id, false, userName);
       toast('success', `${asset.service_tag} removido do treinamento.`);
       loadTraining();
     } catch (e) {
@@ -75,10 +77,10 @@ export const TrainingPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Notebooks de Treinamento
+              Equipamentos de Treinamento
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {trainingAssets.length} notebook{trainingAssets.length !== 1 ? 's' : ''} designado{trainingAssets.length !== 1 ? 's' : ''} para treinamento
+              {trainingAssets.length} equipamento{trainingAssets.length !== 1 ? 's' : ''} designado{trainingAssets.length !== 1 ? 's' : ''} para treinamento
             </p>
           </div>
         </div>
@@ -94,10 +96,10 @@ export const TrainingPage: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center">
           <GraduationCap className="h-12 w-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
           <p className="text-slate-500 dark:text-slate-400">
-            Nenhum notebook de treinamento cadastrado.
+            Nenhum equipamento de treinamento cadastrado.
           </p>
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-            Clique em "Adicionar" para designar notebooks existentes para treinamento.
+            Clique em "Adicionar" para designar equipamentos existentes para treinamento.
           </p>
         </div>
       ) : (
@@ -189,7 +191,6 @@ const AddTrainingModal: React.FC<{
       setLoading(true);
       try {
         const filtros: AssetFilters = {
-          equipment_type: 'NOTEBOOK',
           sort_by: 'service_tag',
           sort_dir: 'ASC',
         };
@@ -210,7 +211,7 @@ const AddTrainingModal: React.FC<{
   const handleAdd = async (asset: Asset) => {
     setAdding(asset.id);
     try {
-      await marcarComoTreinamento(asset.id, true);
+      await marcarComoTreinamento(asset.id, true, useAuthStore.getState().user?.name ?? 'sistema');
       toast('success', `${asset.service_tag} adicionado ao treinamento.`);
       setNotebooks((prev) => prev.filter((a) => a.id !== asset.id));
       onAdded();
@@ -226,7 +227,7 @@ const AddTrainingModal: React.FC<{
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-            Adicionar Notebook ao Treinamento
+            Adicionar Equipamento ao Treinamento
           </h3>
           <button onClick={onClose} title="Fechar" className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             <X className="h-4 w-4 text-slate-500" />
@@ -266,7 +267,7 @@ const AddTrainingModal: React.FC<{
             <div className="py-8 text-center">
               <Monitor className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Nenhum notebook disponível para adicionar.
+                Nenhum equipamento disponivel para adicionar.
               </p>
             </div>
           ) : (

@@ -27,6 +27,9 @@ import { TrainingPage } from '@/features/training/pages/TrainingPage';
 import { UsersPage } from '@/features/users/pages/UsersPage';
 import { LoansPage } from '@/features/loans/pages/LoansPage';
 import { NotesPage } from '@/features/notes/pages/NotesPage';
+import { DescartePage } from '@/features/disposal/pages/DescartePage';
+import { DesligadosPage } from '@/features/desligados/pages/DesligadosPage';
+import { TrashPage } from '@/features/trash/pages/TrashPage';
 import { verificarBackupAutomatico, registrarAcesso } from '@/data/commands';
 
 const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
@@ -61,6 +64,12 @@ const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
       return <SettingsPage />;
     case 'help':
       return <HelpPage />;
+    case 'disposal':
+      return <DescartePage />;
+    case 'desligados':
+      return <DesligadosPage />;
+    case 'trash':
+      return <TrashPage />;
     default:
       return <DashboardPage />;
   }

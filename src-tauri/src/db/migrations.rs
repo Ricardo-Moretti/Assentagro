@@ -234,6 +234,111 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
         info!("Migração 010 concluída.");
     }
 
+    // Migration 011 — Descarte de equipamentos
+    if versao_atual < 11 {
+        info!("Executando migração 011: descartes...");
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS descartes (
+                id              VARCHAR(36)  NOT NULL PRIMARY KEY,
+                asset_id        VARCHAR(36)  NOT NULL,
+                motivo          VARCHAR(50)  NOT NULL DEFAULT 'OBSOLESCENCIA',
+                destino         VARCHAR(255) NOT NULL DEFAULT '',
+                responsavel     VARCHAR(255) NOT NULL DEFAULT '',
+                data_prevista   VARCHAR(30)  NULL,
+                data_conclusao  VARCHAR(30)  NULL,
+                status          VARCHAR(20)  NOT NULL DEFAULT 'PENDENTE',
+                observacoes     TEXT         NULL,
+                registrado_por  VARCHAR(255) NULL,
+                created_at      VARCHAR(30)  NOT NULL,
+                updated_at      VARCHAR(30)  NOT NULL,
+                KEY idx_descartes_asset  (asset_id),
+                KEY idx_descartes_status (status),
+                CONSTRAINT fk_descartes_asset FOREIGN KEY (asset_id)
+                    REFERENCES assets(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (11)")?;
+        info!("Migração 011 concluída.");
+    }
+
+    // Migration 012 — Desligamento de colaboradores
+    if versao_atual < 12 {
+        info!("Executando migracao 012: desligamentos...");
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS desligamentos (
+                id               VARCHAR(36)  NOT NULL PRIMARY KEY,
+                asset_id         VARCHAR(36)  NOT NULL,
+                employee_name    VARCHAR(255) NOT NULL,
+                service_tag      VARCHAR(100) NULL,
+                equipment_type   VARCHAR(20)  NULL,
+                model            VARCHAR(255) NULL,
+                branch_name      VARCHAR(255) NULL,
+                data_desligamento VARCHAR(30) NOT NULL,
+                data_devolucao   VARCHAR(30)  NULL,
+                status           VARCHAR(20)  NOT NULL DEFAULT 'AGUARDANDO',
+                observacoes      TEXT         NULL,
+                registrado_por   VARCHAR(255) NULL,
+                created_at       VARCHAR(30)  NOT NULL,
+                updated_at       VARCHAR(30)  NOT NULL,
+                KEY idx_deslig_asset  (asset_id),
+                KEY idx_deslig_status (status),
+                CONSTRAINT fk_deslig_asset FOREIGN KEY (asset_id)
+                    REFERENCES assets(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (12)")?;
+        info!("Migracao 012 concluida.");
+    }
+
+    // Migration 013 — Auditoria com rastreamento de usuario
+    if versao_atual < 13 {
+        info!("Executando migracao 013: audit changed_by...");
+        conn.query_drop(
+            "ALTER TABLE asset_audit ADD COLUMN changed_by VARCHAR(255) NULL AFTER changes_json"
+        )?;
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (13)")?;
+        info!("Migracao 013 concluida.");
+    }
+
+    // Migration 014 — Controle de tentativas de login
+    if versao_atual < 14 {
+        info!("Executando migracao 014: login_attempts...");
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS login_attempts (
+                id           VARCHAR(36)  NOT NULL PRIMARY KEY,
+                username     VARCHAR(100) NOT NULL,
+                success      TINYINT(1)   NOT NULL DEFAULT 0,
+                ip_info      VARCHAR(100) NULL,
+                attempted_at VARCHAR(30)  NOT NULL,
+                KEY idx_attempts_user (username),
+                KEY idx_attempts_at   (attempted_at)
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (14)")?;
+        info!("Migracao 014 concluida.");
+    }
+
+    // Migration 015 — Soft delete de ativos
+    if versao_atual < 15 {
+        info!("Executando migracao 015: soft delete...");
+
+        conn.query_drop(
+            "ALTER TABLE assets ADD COLUMN deleted_at VARCHAR(30) NULL"
+        )?;
+        conn.query_drop(
+            "ALTER TABLE assets ADD COLUMN deleted_by VARCHAR(255) NULL"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (15)")?;
+        info!("Migracao 015 concluida.");
+    }
+
     // Seed default admin user
     seed_admin_user(conn)?;
 

@@ -12,6 +12,7 @@ import { MaintenanceSendForm } from '../components/MaintenanceSendForm';
 import { MaintenanceReturnForm } from '../components/MaintenanceReturnForm';
 import { MaintenanceHistory } from '../components/MaintenanceHistory';
 import { ReassignForm } from '../components/ReassignForm';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { enviarParaManutencao, retornarDeManutencao, reatribuirEquipamento } from '@/data/commands';
 
 const PER_PAGE = 10;
@@ -34,6 +35,7 @@ export const MovementsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const { movements, stockAssets, inUseAssets, loading, assign, returnAsset, swap } = useMovements();
   const { toast } = useToast();
+  const userName = useAuthStore((s) => s.user?.name) ?? 'sistema';
 
   const totalPages = Math.max(1, Math.ceil(movements.length / PER_PAGE));
   const safePage = Math.min(page, totalPages);
@@ -86,7 +88,7 @@ export const MovementsPage: React.FC = () => {
   const handleReassign = async (assetId: string, toEmployee: string, reason: string) => {
     setSubmitting(true);
     try {
-      const mov = await reatribuirEquipamento({ asset_id: assetId, to_employee: toEmployee, reason });
+      const mov = await reatribuirEquipamento({ asset_id: assetId, to_employee: toEmployee, reason }, userName);
       toast('success', `${mov.service_tag} reatribuído a ${toEmployee}.`);
     } catch (e) {
       toast('error', `Falha: ${e}`);
@@ -99,7 +101,7 @@ export const MovementsPage: React.FC = () => {
   const handleMaintenanceSend = async (assetId: string, supplier: string, expectedDate?: string, cost?: number, notes?: string) => {
     setSubmitting(true);
     try {
-      const rec = await enviarParaManutencao({ asset_id: assetId, supplier, expected_return_date: expectedDate, cost, notes });
+      const rec = await enviarParaManutencao({ asset_id: assetId, supplier, expected_return_date: expectedDate, cost, notes }, userName);
       toast('success', `${rec.service_tag ?? 'Equipamento'} enviado para manutenção.`);
     } catch (e) {
       toast('error', `Falha: ${e}`);
@@ -112,7 +114,7 @@ export const MovementsPage: React.FC = () => {
   const handleMaintenanceReturn = async (maintenanceId: string, cost?: number, notes?: string) => {
     setSubmitting(true);
     try {
-      const rec = await retornarDeManutencao({ maintenance_id: maintenanceId, cost, notes });
+      const rec = await retornarDeManutencao({ maintenance_id: maintenanceId, cost, notes }, userName);
       toast('success', `${rec.service_tag ?? 'Equipamento'} retornou da manutenção.`);
     } catch (e) {
       toast('error', `Falha: ${e}`);

@@ -68,7 +68,7 @@ export const LoansPage: React.FC = () => {
   const handleDevolver = async (loan: AssetLoan) => {
     if (!confirm(`Confirmar devolução de "${loan.service_tag ?? loan.asset_id}"?`)) return;
     try {
-      await devolverEmprestimo(loan.id);
+      await devolverEmprestimo(loan.id, undefined, useAuthStore.getState().user?.name ?? 'sistema');
       toast('success', 'Devolução registrada.');
       load();
     } catch (e) {
@@ -318,7 +318,7 @@ const LoanFormModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({
         previsao_retorno: form.previsao_retorno || undefined,
         observacoes: form.observacoes.trim() || undefined,
         registrado_por: user?.name ?? user?.username,
-      });
+      }, user?.name ?? 'sistema');
       toast('success', 'Saída registrada com sucesso.');
       onSaved();
     } catch (e) {

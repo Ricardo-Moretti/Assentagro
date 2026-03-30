@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 import { importarAtivos } from '@/data/commands';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useRBAC } from '@/hooks/useRBAC';
 import {
   BRANCHES,
   ASSET_STATUSES,
@@ -74,6 +76,7 @@ interface ParsedRow {
 
 export const ImportPage: React.FC = () => {
   const { toast } = useToast();
+  const { role } = useRBAC();
   const [mode, setMode] = useState<'update' | 'skip'>('skip');
   const [fileName, setFileName] = useState('');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
@@ -193,7 +196,7 @@ export const ImportPage: React.FC = () => {
     setImporting(true);
     try {
       const dtos = parsedRows.map((r) => r.dto);
-      const res = await importarAtivos(dtos, mode);
+      const res = await importarAtivos(dtos, mode, useAuthStore.getState().user?.name ?? 'sistema', role);
       setResult(res);
       toast(
         res.errors.length > 0 ? 'warning' : 'success',

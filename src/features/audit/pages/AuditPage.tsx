@@ -4,6 +4,10 @@ import {
   Pencil,
   Trash2,
   ArrowLeftRight,
+  UserX,
+  GraduationCap,
+  Package,
+  Wrench,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -72,6 +76,78 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; bg: string; 
     bg: 'bg-purple-100 dark:bg-purple-900/30',
     icon: <ArrowLeftRight className="h-4 w-4" />,
   },
+  DESLIGAMENTO: {
+    label: 'Desligamento',
+    color: 'text-orange-600 dark:text-orange-400',
+    bg: 'bg-orange-100 dark:bg-orange-900/30',
+    icon: <UserX className="h-4 w-4" />,
+  },
+  DEVOLUCAO_DESLIGAMENTO: {
+    label: 'Devolucao (Desligamento)',
+    color: 'text-green-600 dark:text-green-400',
+    bg: 'bg-green-100 dark:bg-green-900/30',
+    icon: <Package className="h-4 w-4" />,
+  },
+  MARCADO_TREINAMENTO: {
+    label: 'Treinamento',
+    color: 'text-indigo-600 dark:text-indigo-400',
+    bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+    icon: <GraduationCap className="h-4 w-4" />,
+  },
+  DESMARCADO_TREINAMENTO: {
+    label: 'Remov. Treinamento',
+    color: 'text-slate-600 dark:text-slate-400',
+    bg: 'bg-slate-100 dark:bg-slate-800',
+    icon: <GraduationCap className="h-4 w-4" />,
+  },
+  DESCARTE_AGENDADO: {
+    label: 'Descarte Agendado',
+    color: 'text-red-600 dark:text-red-400',
+    bg: 'bg-red-100 dark:bg-red-900/30',
+    icon: <Trash2 className="h-4 w-4" />,
+  },
+  DESCARTE_CONCLUIDO: {
+    label: 'Descarte Concluido',
+    color: 'text-red-700 dark:text-red-300',
+    bg: 'bg-red-100 dark:bg-red-900/30',
+    icon: <Trash2 className="h-4 w-4" />,
+  },
+  DESCARTE_CANCELADO: {
+    label: 'Descarte Cancelado',
+    color: 'text-slate-600 dark:text-slate-400',
+    bg: 'bg-slate-100 dark:bg-slate-800',
+    icon: <Trash2 className="h-4 w-4" />,
+  },
+  EMPRESTIMO_CRIADO: {
+    label: 'Emprestimo',
+    color: 'text-cyan-600 dark:text-cyan-400',
+    bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+    icon: <ArrowLeftRight className="h-4 w-4" />,
+  },
+  EMPRESTIMO_DEVOLVIDO: {
+    label: 'Devol. Emprestimo',
+    color: 'text-cyan-700 dark:text-cyan-300',
+    bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+    icon: <Package className="h-4 w-4" />,
+  },
+  ENVIADO_MANUTENCAO: {
+    label: 'Env. Manutencao',
+    color: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-100 dark:bg-amber-900/30',
+    icon: <Wrench className="h-4 w-4" />,
+  },
+  RETORNADO_MANUTENCAO: {
+    label: 'Ret. Manutencao',
+    color: 'text-amber-700 dark:text-amber-300',
+    bg: 'bg-amber-100 dark:bg-amber-900/30',
+    icon: <Wrench className="h-4 w-4" />,
+  },
+  BAIXADO: {
+    label: 'Baixado em Lote',
+    color: 'text-slate-600 dark:text-slate-400',
+    bg: 'bg-slate-100 dark:bg-slate-800',
+    icon: <Trash2 className="h-4 w-4" />,
+  },
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -94,6 +170,14 @@ const FIELD_LABELS: Record<string, string> = {
   from_employee: 'De',
   swapped_with: 'Trocado com',
   branch_name: 'Filial',
+  colaborador: 'Colaborador',
+  colaborador_anterior: 'Ex-Colaborador',
+  status_anterior: 'Status Anterior',
+  status_novo: 'Novo Status',
+  motivo: 'Motivo',
+  destino: 'Destino',
+  responsavel: 'Responsavel',
+  tipo: 'Tipo',
 };
 
 export const AuditPage: React.FC = () => {

@@ -20,6 +20,14 @@ fn err(e: anyhow::Error) -> String {
     format!("{:#}", e)
 }
 
+/// Verifica se o usuario tem role admin. Retorna Err se nao.
+fn exigir_admin(role: &str) -> Result<(), String> {
+    if role != "admin" {
+        return Err("Acesso negado: esta operacao requer permissao de administrador.".to_string());
+    }
+    Ok(())
+}
+
 // ============================================================
 // Filiais
 // ============================================================
@@ -50,9 +58,9 @@ pub fn obter_ativo(state: State<'_, AppState>, id: String) -> Result<Asset, Stri
 }
 
 #[tauri::command]
-pub fn criar_ativo(state: State<'_, AppState>, dados: CreateAssetDto) -> Result<Asset, String> {
+pub fn criar_ativo(state: State<'_, AppState>, dados: CreateAssetDto, usuario: String) -> Result<Asset, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::criar_ativo(&mut conn, &dados).map_err(err)
+    queries::criar_ativo(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
@@ -60,15 +68,17 @@ pub fn atualizar_ativo(
     state: State<'_, AppState>,
     id: String,
     dados: UpdateAssetDto,
+    usuario: String,
 ) -> Result<Asset, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::atualizar_ativo(&mut conn, &id, &dados).map_err(err)
+    queries::atualizar_ativo(&mut conn, &id, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
-pub fn excluir_ativo(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub fn excluir_ativo(state: State<'_, AppState>, id: String, usuario: String, role: String) -> Result<(), String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::excluir_ativo(&mut conn, &id).map_err(err)
+    queries::excluir_ativo(&mut conn, &id, &usuario).map_err(err)
 }
 
 // ============================================================
@@ -119,9 +129,12 @@ pub fn importar_ativos(
     state: State<'_, AppState>,
     ativos: Vec<CreateAssetDto>,
     modo: String,
+    usuario: String,
+    role: String,
 ) -> Result<queries::ImportResult, String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::importar_ativos(&mut conn, &ativos, &modo).map_err(err)
+    queries::importar_ativos(&mut conn, &ativos, &modo, &usuario).map_err(err)
 }
 
 // ============================================================
@@ -129,13 +142,15 @@ pub fn importar_ativos(
 // ============================================================
 
 #[tauri::command]
-pub fn criar_backup(state: State<'_, AppState>, destino: String) -> Result<String, String> {
+pub fn criar_backup(state: State<'_, AppState>, destino: String, role: String) -> Result<String, String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::criar_backup(&mut conn, &destino).map_err(err)
 }
 
 #[tauri::command]
-pub fn restaurar_backup(state: State<'_, AppState>, origem: String) -> Result<(), String> {
+pub fn restaurar_backup(state: State<'_, AppState>, origem: String, role: String) -> Result<(), String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::restaurar_backup(&mut conn, &origem).map_err(err)
 }
@@ -148,36 +163,40 @@ pub fn restaurar_backup(state: State<'_, AppState>, origem: String) -> Result<()
 pub fn atribuir_equipamento(
     state: State<'_, AppState>,
     dados: AssignDto,
+    usuario: String,
 ) -> Result<Movement, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::atribuir_equipamento(&mut conn, &dados).map_err(err)
+    queries::atribuir_equipamento(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
 pub fn reatribuir_equipamento(
     state: State<'_, AppState>,
     dados: AssignDto,
+    usuario: String,
 ) -> Result<Movement, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::reatribuir_equipamento(&mut conn, &dados).map_err(err)
+    queries::reatribuir_equipamento(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
 pub fn devolver_equipamento(
     state: State<'_, AppState>,
     dados: ReturnDto,
+    usuario: String,
 ) -> Result<Movement, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::devolver_equipamento(&mut conn, &dados).map_err(err)
+    queries::devolver_equipamento(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
 pub fn trocar_equipamentos(
     state: State<'_, AppState>,
     dados: SwapDto,
+    usuario: String,
 ) -> Result<Vec<Movement>, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::trocar_equipamentos(&mut conn, &dados).map_err(err)
+    queries::trocar_equipamentos(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
@@ -265,18 +284,20 @@ pub fn criar_colaborador(
 pub fn enviar_para_manutencao(
     state: State<'_, AppState>,
     dados: SendMaintenanceDto,
+    usuario: String,
 ) -> Result<MaintenanceRecord, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::enviar_para_manutencao(&mut conn, &dados).map_err(err)
+    queries::enviar_para_manutencao(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command]
 pub fn retornar_de_manutencao(
     state: State<'_, AppState>,
     dados: ReturnMaintenanceDto,
+    usuario: String,
 ) -> Result<MaintenanceRecord, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::retornar_de_manutencao(&mut conn, &dados).map_err(err)
+    queries::retornar_de_manutencao(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -297,9 +318,10 @@ pub fn devolver_em_lote(
     state: State<'_, AppState>,
     asset_ids: Vec<String>,
     reason: String,
+    usuario: String,
 ) -> Result<Vec<Movement>, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::devolver_em_lote(&mut conn, &asset_ids, &reason).map_err(err)
+    queries::devolver_em_lote(&mut conn, &asset_ids, &reason, &usuario).map_err(err)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -307,9 +329,12 @@ pub fn baixar_em_lote(
     state: State<'_, AppState>,
     asset_ids: Vec<String>,
     reason: String,
+    usuario: String,
+    role: String,
 ) -> Result<usize, String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::baixar_em_lote(&mut conn, &asset_ids, &reason).map_err(err)
+    queries::baixar_em_lote(&mut conn, &asset_ids, &reason, &usuario).map_err(err)
 }
 
 // ============================================================
@@ -337,9 +362,10 @@ pub fn marcar_como_treinamento(
     state: State<'_, AppState>,
     asset_id: String,
     is_training: bool,
+    usuario: String,
 ) -> Result<Asset, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::marcar_como_treinamento(&mut conn, &asset_id, is_training).map_err(err)
+    queries::marcar_como_treinamento(&mut conn, &asset_id, is_training, &usuario).map_err(err)
 }
 
 // ============================================================
@@ -466,7 +492,9 @@ pub fn autenticar_usuario(
 pub fn criar_usuario(
     state: State<'_, AppState>,
     dados: CreateUserDto,
+    role: String,
 ) -> Result<User, String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::criar_usuario(&mut conn, &dados).map_err(err)
 }
@@ -481,13 +509,16 @@ pub fn listar_usuarios(state: State<'_, AppState>) -> Result<Vec<User>, String> 
 pub fn alterar_senha(
     state: State<'_, AppState>,
     dados: ChangePasswordDto,
+    role: String,
 ) -> Result<(), String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::alterar_senha(&mut conn, &dados).map_err(err)
 }
 
 #[tauri::command]
-pub fn desativar_usuario(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub fn desativar_usuario(state: State<'_, AppState>, id: String, role: String) -> Result<(), String> {
+    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::desativar_usuario(&mut conn, &id).map_err(err)
 }
@@ -519,9 +550,10 @@ pub fn verificar_conexao(state: State<'_, AppState>) -> Result<bool, String> {
 pub fn criar_emprestimo(
     state: State<'_, AppState>,
     dados: CreateLoanDto,
+    usuario: String,
 ) -> Result<AssetLoan, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::criar_emprestimo(&mut conn, &dados).map_err(err)
+    queries::criar_emprestimo(&mut conn, &dados, &usuario).map_err(err)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -529,9 +561,10 @@ pub fn devolver_emprestimo(
     state: State<'_, AppState>,
     id: String,
     observacoes: Option<String>,
+    usuario: String,
 ) -> Result<AssetLoan, String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
-    queries::devolver_emprestimo(&mut conn, &id, observacoes.as_deref()).map_err(err)
+    queries::devolver_emprestimo(&mut conn, &id, observacoes.as_deref(), &usuario).map_err(err)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -588,4 +621,111 @@ pub fn atualizar_nota(
 pub fn excluir_nota(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::excluir_nota(&mut conn, &id).map_err(err)
+}
+
+// ============================================================
+// Descarte de equipamentos
+// ============================================================
+
+#[tauri::command]
+pub fn listar_candidatos_descarte(state: State<'_, AppState>) -> Result<Vec<Asset>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_candidatos_descarte(&mut conn).map_err(err)
+}
+
+#[tauri::command]
+pub fn criar_descarte(
+    state: State<'_, AppState>,
+    dados: CreateDescarteDto,
+    usuario: String,
+) -> Result<Descarte, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::criar_descarte(&mut conn, &dados, &usuario).map_err(err)
+}
+
+#[tauri::command]
+pub fn listar_descartes(
+    state: State<'_, AppState>,
+    status: Option<String>,
+) -> Result<Vec<Descarte>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_descartes(&mut conn, status.as_deref()).map_err(err)
+}
+
+#[tauri::command]
+pub fn concluir_descarte(state: State<'_, AppState>, id: String, usuario: String) -> Result<Descarte, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::concluir_descarte(&mut conn, &id, &usuario).map_err(err)
+}
+
+#[tauri::command]
+pub fn cancelar_descarte(state: State<'_, AppState>, id: String, usuario: String) -> Result<Descarte, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::cancelar_descarte(&mut conn, &id, &usuario).map_err(err)
+}
+
+// ============================================================
+// Desligamento de colaboradores
+// ============================================================
+
+#[tauri::command]
+pub fn desligar_colaborador(
+    state: State<'_, AppState>,
+    dados: CreateDesligamentoDto,
+    usuario: String,
+) -> Result<Desligamento, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::desligar_colaborador(&mut conn, &dados, &usuario).map_err(err)
+}
+
+#[tauri::command]
+pub fn listar_desligamentos(
+    state: State<'_, AppState>,
+    status: Option<String>,
+) -> Result<Vec<Desligamento>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_desligamentos(&mut conn, status.as_deref()).map_err(err)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn listar_desligamentos_por_ativo(
+    state: State<'_, AppState>,
+    asset_id: String,
+) -> Result<Vec<Desligamento>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_desligamentos_por_ativo(&mut conn, &asset_id).map_err(err)
+}
+
+#[tauri::command]
+pub fn confirmar_devolucao(state: State<'_, AppState>, id: String, usuario: String) -> Result<Desligamento, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::confirmar_devolucao(&mut conn, &id, &usuario).map_err(err)
+}
+
+#[tauri::command]
+pub fn cancelar_desligamento(state: State<'_, AppState>, id: String) -> Result<Desligamento, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::cancelar_desligamento(&mut conn, &id).map_err(err)
+}
+
+// ============================================================
+// Lixeira — ativos soft-deleted
+// ============================================================
+
+#[tauri::command]
+pub fn listar_ativos_excluidos(state: State<'_, AppState>) -> Result<Vec<DeletedAsset>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_ativos_excluidos(&mut conn).map_err(err)
+}
+
+#[tauri::command]
+pub fn restaurar_ativo(
+    state: State<'_, AppState>,
+    id: String,
+    usuario: String,
+    role: String,
+) -> Result<Asset, String> {
+    exigir_admin(&role)?;
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::restaurar_ativo(&mut conn, &id, &usuario).map_err(err)
 }

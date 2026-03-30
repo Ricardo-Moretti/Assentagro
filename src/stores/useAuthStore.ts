@@ -17,7 +17,6 @@ function loadSession(): { user: User | null; isAuthenticated: boolean } {
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-
   login: (user: User) => void;
   logout: () => void;
 }

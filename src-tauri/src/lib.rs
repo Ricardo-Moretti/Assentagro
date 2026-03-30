@@ -35,7 +35,7 @@ pub fn run() {
                     let _ = w.show();
                     let _ = tauri_plugin_dialog::DialogExt::dialog(app)
                         .message(&msg)
-                        .title("AssetAgro — Erro de Conexão")
+                        .title("Controle de Ativos — Erro de Conexao")
                         .blocking_show();
                 }
                 msg
@@ -47,7 +47,7 @@ pub fn run() {
             });
 
             // System tray
-            let show_item = MenuItemBuilder::with_id("show", "Abrir AssetAgro").build(app)?;
+            let show_item = MenuItemBuilder::with_id("show", "Abrir Controle de Ativos").build(app)?;
             let quit_item = MenuItemBuilder::with_id("quit", "Sair").build(app)?;
             let tray_menu = MenuBuilder::new(app)
                 .item(&show_item)
@@ -56,7 +56,7 @@ pub fn run() {
                 .build()?;
 
             let _tray = TrayIconBuilder::new()
-                .tooltip("AssetAgro — Gestão de Ativos")
+                .tooltip("Controle de Ativos — Tracbel Agro")
                 .menu(&tray_menu)
                 .on_menu_event(move |app_handle, event| {
                     match event.id().as_ref() {
@@ -86,7 +86,7 @@ pub fn run() {
                 }
             });
 
-            log::info!("AssetAgro iniciado com sucesso.");
+            log::info!("Controle de Ativos iniciado com sucesso.");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -170,7 +170,22 @@ pub fn run() {
             commands::criar_nota,
             commands::atualizar_nota,
             commands::excluir_nota,
+            // Descarte de equipamentos
+            commands::listar_candidatos_descarte,
+            commands::criar_descarte,
+            commands::listar_descartes,
+            commands::concluir_descarte,
+            commands::cancelar_descarte,
+            // Desligamento de colaboradores
+            commands::desligar_colaborador,
+            commands::listar_desligamentos,
+            commands::listar_desligamentos_por_ativo,
+            commands::confirmar_devolucao,
+            commands::cancelar_desligamento,
+            // Lixeira
+            commands::listar_ativos_excluidos,
+            commands::restaurar_ativo,
         ])
         .run(tauri::generate_context!())
-        .expect("Erro ao executar AssetAgro");
+        .expect("Erro ao executar Controle de Ativos");
 }

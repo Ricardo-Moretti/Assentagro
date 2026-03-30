@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '@/data/commands';
 import { useFilterStore } from '@/stores/useFilterStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { Asset } from '@/domain/models';
 
 export function useAssets() {
@@ -27,7 +28,9 @@ export function useAssets() {
   }, [load]);
 
   const deleteAsset = async (id: string) => {
-    await api.excluirAtivo(id);
+    const userName = useAuthStore.getState().user?.name ?? 'sistema';
+    const userRole = useAuthStore.getState().user?.role ?? 'user';
+    await api.excluirAtivo(id, userName, userRole);
     setAssets((prev) => prev.filter((a) => a.id !== id));
   };
 
