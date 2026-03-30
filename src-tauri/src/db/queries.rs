@@ -675,12 +675,12 @@ fn obter_stats(conn: &mut PooledConn, branch_id: Option<&str>) -> Result<Dashboa
         Some((total, in_use, stock, maintenance, retired, notebooks, desktops, in_use_no_employee, training)) => {
             // Ativos por colaborador (media)
             let employees_with_assets: f64 = conn
-                .exec_first::<f64, _, _>(
+                .exec_first::<i64, _, _>(
                     "SELECT COUNT(DISTINCT employee_name) FROM assets WHERE employee_name IS NOT NULL AND employee_name != '' AND status = 'IN_USE' AND deleted_at IS NULL",
                     (),
                 )
-                .unwrap_or(Some(0.0))
-                .unwrap_or(0.0);
+                .unwrap_or(Some(0))
+                .unwrap_or(0) as f64;
 
             let assets_per_employee = if employees_with_assets > 0.0 {
                 in_use as f64 / employees_with_assets
