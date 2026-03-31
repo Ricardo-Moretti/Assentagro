@@ -377,13 +377,13 @@ export const d4signUploadDocumento = (filepath: string, filename: string): Promi
   invoke('d4sign_upload_documento', { filepath, filename });
 
 export const d4signAdicionarSignatario = (documentoUuid: string, email: string): Promise<string> =>
-  invoke('d4sign_adicionar_signatario', { documento_uuid: documentoUuid, email });
+  invoke('d4sign_adicionar_signatario', { documentoUuid, email });
 
 export const d4signEnviarParaAssinatura = (documentoUuid: string): Promise<string> =>
-  invoke('d4sign_enviar_para_assinatura', { documento_uuid: documentoUuid });
+  invoke('d4sign_enviar_para_assinatura', { documentoUuid });
 
 export const d4signConsultarStatus = (documentoUuid: string): Promise<string> =>
-  invoke('d4sign_consultar_status', { documento_uuid: documentoUuid });
+  invoke('d4sign_consultar_status', { documentoUuid });
 
 export const d4signBaixarAssinado = (documentoUuid: string, destino: string): Promise<string> =>
-  invoke('d4sign_baixar_assinado', { documento_uuid: documentoUuid, destino });
+  invoke('d4sign_baixar_assinado', { documentoUuid, destino });
