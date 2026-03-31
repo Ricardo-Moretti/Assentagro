@@ -185,6 +185,23 @@ pub fn run() {
             // Lixeira
             commands::listar_ativos_excluidos,
             commands::restaurar_ativo,
+            // Termos de responsabilidade
+            commands::criar_termo,
+            commands::obter_termo,
+            commands::listar_termos,
+            commands::listar_termos_por_ativo,
+            commands::atualizar_termo,
+            commands::excluir_termo,
+            // Configuração D4Sign
+            commands::obter_d4sign_config,
+            commands::salvar_d4sign_config,
+            commands::d4sign_testar_conexao,
+            commands::d4sign_listar_cofres,
+            commands::d4sign_upload_documento,
+            commands::d4sign_adicionar_signatario,
+            commands::d4sign_enviar_para_assinatura,
+            commands::d4sign_consultar_status,
+            commands::d4sign_baixar_assinado,
         ])
         .run(tauri::generate_context!())
         .expect("Erro ao executar Controle de Ativos");

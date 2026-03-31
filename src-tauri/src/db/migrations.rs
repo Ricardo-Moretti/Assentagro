@@ -339,6 +339,70 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
         info!("Migracao 015 concluida.");
     }
 
+    // Migration 016 — Termos de responsabilidade + D4Sign
+    if versao_atual < 16 {
+        info!("Executando migracao 016: termos + d4sign_config...");
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS termos (
+                id                  VARCHAR(36)  NOT NULL PRIMARY KEY,
+                colaborador_id      VARCHAR(36)  NULL,
+                colaborador_nome    VARCHAR(255) NOT NULL,
+                colaborador_email   VARCHAR(255) NULL,
+                tipo                VARCHAR(20)  NOT NULL DEFAULT 'ENTREGA',
+                status              VARCHAR(30)  NOT NULL DEFAULT 'PENDENTE',
+                responsavel         VARCHAR(255) NOT NULL DEFAULT '',
+                observacoes         TEXT         NULL,
+                arquivo_gerado      VARCHAR(500) NULL,
+                arquivo_assinado    VARCHAR(500) NULL,
+                d4sign_uuid         VARCHAR(100) NULL,
+                d4sign_status       VARCHAR(50)  NULL,
+                d4sign_enviado_em   VARCHAR(30)  NULL,
+                data_geracao        VARCHAR(30)  NOT NULL,
+                data_assinatura     VARCHAR(30)  NULL,
+                created_at          VARCHAR(30)  NOT NULL,
+                updated_at          VARCHAR(30)  NOT NULL,
+                KEY idx_termos_status       (status),
+                KEY idx_termos_tipo         (tipo),
+                KEY idx_termos_d4sign       (d4sign_uuid),
+                KEY idx_termos_colaborador  (colaborador_nome)
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS termos_ativos (
+                id         VARCHAR(36) NOT NULL PRIMARY KEY,
+                termo_id   VARCHAR(36) NOT NULL,
+                asset_id   VARCHAR(36) NOT NULL,
+                created_at VARCHAR(30) NOT NULL,
+                KEY idx_ta_termo (termo_id),
+                KEY idx_ta_asset (asset_id),
+                CONSTRAINT fk_ta_termo FOREIGN KEY (termo_id)
+                    REFERENCES termos(id) ON DELETE CASCADE,
+                CONSTRAINT fk_ta_asset FOREIGN KEY (asset_id)
+                    REFERENCES assets(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS d4sign_config (
+                id          INT          NOT NULL PRIMARY KEY DEFAULT 1,
+                habilitado  TINYINT(1)   NOT NULL DEFAULT 0,
+                token_api   VARCHAR(255) NOT NULL DEFAULT '',
+                crypt_key   VARCHAR(255) NOT NULL DEFAULT '',
+                cofre_uuid  VARCHAR(100) NOT NULL DEFAULT '',
+                base_url    VARCHAR(255) NOT NULL DEFAULT 'https://sandbox.d4sign.com.br/api/v1',
+                envio_automatico TINYINT(1) NOT NULL DEFAULT 0,
+                mensagem_email   TEXT     NULL,
+                updated_at  VARCHAR(30)  NOT NULL,
+                CONSTRAINT chk_singleton CHECK (id = 1)
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (16)")?;
+        info!("Migracao 016 concluida.");
+    }
+
     // Seed default admin user
     seed_admin_user(conn)?;
 

@@ -30,6 +30,7 @@ import { NotesPage } from '@/features/notes/pages/NotesPage';
 import { DescartePage } from '@/features/disposal/pages/DescartePage';
 import { DesligadosPage } from '@/features/desligados/pages/DesligadosPage';
 import { TrashPage } from '@/features/trash/pages/TrashPage';
+import { TermosPage } from '@/features/termos/pages/TermosPage';
 import { verificarBackupAutomatico, registrarAcesso } from '@/data/commands';
 
 const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
@@ -70,6 +71,8 @@ const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
       return <DesligadosPage />;
     case 'trash':
       return <TrashPage />;
+    case 'termos':
+      return <TermosPage />;
     default:
       return <DashboardPage />;
   }

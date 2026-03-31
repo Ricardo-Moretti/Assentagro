@@ -28,7 +28,9 @@ export type AppView =
   | 'help'
   | 'disposal'
   | 'desligados'
-  | 'trash';
+  | 'trash'
+  | 'termos'
+  | 'd4sign-config';
 
 export interface Branch {
   id: string;
@@ -418,4 +420,89 @@ export interface CreateNotaDto {
   corpo: string;
   categoria: NotaCategoria;
   autor: string;
+}
+
+// ============================================================
+// Termos de responsabilidade
+// ============================================================
+
+export type TipoTermo = 'ENTREGA' | 'DEVOLUCAO' | 'TROCA';
+export type StatusTermo = 'PENDENTE' | 'GERADO' | 'ENVIADO' | 'ASSINADO' | 'RECUSADO';
+
+export interface TermoAtivo {
+  id: string;
+  termo_id: string;
+  asset_id: string;
+  service_tag?: string;
+  equipment_type?: string;
+  model?: string;
+  branch_name?: string;
+  created_at: string;
+}
+
+export interface Termo {
+  id: string;
+  colaborador_id?: string;
+  colaborador_nome: string;
+  colaborador_email?: string;
+  tipo: TipoTermo;
+  status: StatusTermo;
+  responsavel: string;
+  observacoes?: string;
+  arquivo_gerado?: string;
+  arquivo_assinado?: string;
+  d4sign_uuid?: string;
+  d4sign_status?: string;
+  d4sign_enviado_em?: string;
+  data_geracao: string;
+  data_assinatura?: string;
+  created_at: string;
+  updated_at: string;
+  ativos?: TermoAtivo[];
+}
+
+export interface CreateTermoDto {
+  colaborador_id?: string;
+  colaborador_nome: string;
+  colaborador_email?: string;
+  asset_ids: string[];
+  tipo: TipoTermo;
+  responsavel: string;
+  observacoes?: string;
+}
+
+export interface UpdateTermoDto {
+  status?: StatusTermo;
+  arquivo_gerado?: string;
+  arquivo_assinado?: string;
+  d4sign_uuid?: string;
+  d4sign_status?: string;
+  d4sign_enviado_em?: string;
+  data_assinatura?: string;
+  observacoes?: string;
+}
+
+// ============================================================
+// Configuração D4Sign
+// ============================================================
+
+export interface D4SignConfig {
+  habilitado: boolean;
+  token_api: string;
+  crypt_key: string;
+  cofre_uuid: string;
+  base_url: string;
+  envio_automatico: boolean;
+  mensagem_email?: string;
+  updated_at: string;
+}
+
+export interface SaveD4SignConfigDto {
+  habilitado: boolean;
+  token_api: string;
+  crypt_key: string;
+  cofre_uuid: string;
+  base_url?: string;
+  envio_automatico: boolean;
+  mensagem_email?: string;
 }

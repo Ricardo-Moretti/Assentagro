@@ -38,6 +38,11 @@ import type {
   Desligamento,
   CreateDesligamentoDto,
   DeletedAsset,
+  Termo,
+  CreateTermoDto,
+  UpdateTermoDto,
+  D4SignConfig,
+  SaveD4SignConfigDto,
 } from '@/domain/models';
 
 // Filiais
@@ -329,3 +334,56 @@ export const listarAtivosExcluidos = (): Promise<DeletedAsset[]> =>
 
 export const restaurarAtivo = (id: string, usuario: string, role: string): Promise<Asset> =>
   invoke('restaurar_ativo', { id, usuario, role });
+
+// ============================================================
+// Termos de responsabilidade
+// ============================================================
+
+export const criarTermo = (dados: CreateTermoDto, usuario: string): Promise<Termo> =>
+  invoke('criar_termo', { dados, usuario });
+
+export const obterTermo = (id: string): Promise<Termo> =>
+  invoke('obter_termo', { id });
+
+export const listarTermos = (status?: string, tipo?: string): Promise<Termo[]> =>
+  invoke('listar_termos', { status: status ?? null, tipo: tipo ?? null });
+
+export const listarTermosPorAtivo = (assetId: string): Promise<Termo[]> =>
+  invoke('listar_termos_por_ativo', { asset_id: assetId });
+
+export const atualizarTermo = (id: string, dados: UpdateTermoDto, usuario: string): Promise<Termo> =>
+  invoke('atualizar_termo', { id, dados, usuario });
+
+export const excluirTermo = (id: string, usuario: string): Promise<void> =>
+  invoke('excluir_termo', { id, usuario });
+
+// ============================================================
+// Configuração D4Sign
+// ============================================================
+
+export const obterD4SignConfig = (): Promise<D4SignConfig | null> =>
+  invoke('obter_d4sign_config');
+
+export const salvarD4SignConfig = (dados: SaveD4SignConfigDto): Promise<D4SignConfig> =>
+  invoke('salvar_d4sign_config', { dados });
+
+export const d4signTestarConexao = (): Promise<string> =>
+  invoke('d4sign_testar_conexao');
+
+export const d4signListarCofres = (): Promise<string> =>
+  invoke('d4sign_listar_cofres');
+
+export const d4signUploadDocumento = (filepath: string, filename: string): Promise<string> =>
+  invoke('d4sign_upload_documento', { filepath, filename });
+
+export const d4signAdicionarSignatario = (documentoUuid: string, email: string): Promise<string> =>
+  invoke('d4sign_adicionar_signatario', { documento_uuid: documentoUuid, email });
+
+export const d4signEnviarParaAssinatura = (documentoUuid: string): Promise<string> =>
+  invoke('d4sign_enviar_para_assinatura', { documento_uuid: documentoUuid });
+
+export const d4signConsultarStatus = (documentoUuid: string): Promise<string> =>
+  invoke('d4sign_consultar_status', { documento_uuid: documentoUuid });
+
+export const d4signBaixarAssinado = (documentoUuid: string, destino: string): Promise<string> =>
+  invoke('d4sign_baixar_assinado', { documento_uuid: documentoUuid, destino });

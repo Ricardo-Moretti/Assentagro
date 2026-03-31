@@ -2747,3 +2747,301 @@ pub fn restaurar_ativo(conn: &mut PooledConn, id: &str, usuario: &str) -> Result
     row_result.into_iter().next().map(row_to_asset)
         .ok_or_else(|| anyhow!("Ativo restaurado nao encontrado"))
 }
+
+// ============================================================
+// Termos de responsabilidade
+// ============================================================
+
+pub fn criar_termo(
+    conn: &mut PooledConn,
+    dados: &CreateTermoDto,
+    usuario: &str,
+) -> Result<Termo> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "INSERT INTO termos (id, colaborador_id, colaborador_nome, colaborador_email, tipo, status, responsavel, observacoes, data_geracao, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'PENDENTE', ?, ?, ?, ?, ?)",
+        (
+            &id,
+            &dados.colaborador_id,
+            &dados.colaborador_nome,
+            &dados.colaborador_email,
+            &dados.tipo,
+            &dados.responsavel,
+            &dados.observacoes,
+            &now,
+            &now,
+            &now,
+        ),
+    ).context("Falha ao criar termo")?;
+
+    // Vincular ativos
+    for asset_id in &dados.asset_ids {
+        let ta_id = uuid::Uuid::new_v4().to_string();
+        conn.exec_drop(
+            "INSERT INTO termos_ativos (id, termo_id, asset_id, created_at) VALUES (?, ?, ?, ?)",
+            (&ta_id, &id, asset_id, &now),
+        ).context("Falha ao vincular ativo ao termo")?;
+    }
+
+    registrar_auditoria_geral(conn, "TERMO_CRIADO", &serde_json::json!({
+        "termo_id": id,
+        "colaborador": dados.colaborador_nome,
+        "tipo": dados.tipo,
+        "ativos": dados.asset_ids,
+    }), usuario)?;
+
+    obter_termo(conn, &id)
+}
+
+pub fn obter_termo(conn: &mut PooledConn, id: &str) -> Result<Termo> {
+    let row: mysql::Row = conn.exec_first(
+        "SELECT id, colaborador_id, colaborador_nome, colaborador_email, tipo, status,
+                responsavel, observacoes, arquivo_gerado, arquivo_assinado,
+                d4sign_uuid, d4sign_status, d4sign_enviado_em,
+                data_geracao, data_assinatura, created_at, updated_at
+         FROM termos WHERE id = ?",
+        (id,),
+    )?.ok_or_else(|| anyhow!("Termo nao encontrado"))?;
+
+    let mut termo = row_to_termo(row);
+
+    // Buscar ativos vinculados
+    let ativos: Vec<mysql::Row> = conn.exec(
+        "SELECT ta.id, ta.termo_id, ta.asset_id, ta.created_at,
+                a.service_tag, a.equipment_type, a.model, b.name AS branch_name
+         FROM termos_ativos ta
+         JOIN assets a ON ta.asset_id = a.id
+         LEFT JOIN branches b ON a.branch_id = b.id
+         WHERE ta.termo_id = ?
+         ORDER BY a.service_tag",
+        (id,),
+    ).context("Falha ao buscar ativos do termo")?;
+
+    termo.ativos = Some(ativos.into_iter().map(row_to_termo_ativo).collect());
+    Ok(termo)
+}
+
+pub fn listar_termos(
+    conn: &mut PooledConn,
+    status: Option<&str>,
+    tipo: Option<&str>,
+) -> Result<Vec<Termo>> {
+    let mut sql = String::from(
+        "SELECT id, colaborador_id, colaborador_nome, colaborador_email, tipo, status,
+                responsavel, observacoes, arquivo_gerado, arquivo_assinado,
+                d4sign_uuid, d4sign_status, d4sign_enviado_em,
+                data_geracao, data_assinatura, created_at, updated_at
+         FROM termos WHERE 1=1"
+    );
+    let mut params: Vec<mysql::Value> = Vec::new();
+
+    if let Some(s) = status {
+        sql.push_str(" AND status = ?");
+        params.push(s.into());
+    }
+    if let Some(t) = tipo {
+        sql.push_str(" AND tipo = ?");
+        params.push(t.into());
+    }
+    sql.push_str(" ORDER BY created_at DESC");
+
+    let rows: Vec<mysql::Row> = conn.exec(&sql, mysql::Params::Positional(params))
+        .context("Falha ao listar termos")?;
+
+    Ok(rows.into_iter().map(row_to_termo).collect())
+}
+
+pub fn listar_termos_por_ativo(
+    conn: &mut PooledConn,
+    asset_id: &str,
+) -> Result<Vec<Termo>> {
+    let rows: Vec<mysql::Row> = conn.exec(
+        "SELECT t.id, t.colaborador_id, t.colaborador_nome, t.colaborador_email, t.tipo, t.status,
+                t.responsavel, t.observacoes, t.arquivo_gerado, t.arquivo_assinado,
+                t.d4sign_uuid, t.d4sign_status, t.d4sign_enviado_em,
+                t.data_geracao, t.data_assinatura, t.created_at, t.updated_at
+         FROM termos t
+         JOIN termos_ativos ta ON t.id = ta.termo_id
+         WHERE ta.asset_id = ?
+         ORDER BY t.created_at DESC",
+        (asset_id,),
+    ).context("Falha ao listar termos do ativo")?;
+
+    Ok(rows.into_iter().map(row_to_termo).collect())
+}
+
+pub fn atualizar_termo(
+    conn: &mut PooledConn,
+    id: &str,
+    dados: &UpdateTermoDto,
+    usuario: &str,
+) -> Result<Termo> {
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let mut sets = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<mysql::Value> = vec![now.clone().into()];
+
+    macro_rules! set_if {
+        ($field:ident) => {
+            if let Some(ref v) = dados.$field {
+                sets.push(format!("{} = ?", stringify!($field)));
+                params.push(v.clone().into());
+            }
+        };
+    }
+    set_if!(status);
+    set_if!(arquivo_gerado);
+    set_if!(arquivo_assinado);
+    set_if!(d4sign_uuid);
+    set_if!(d4sign_status);
+    set_if!(d4sign_enviado_em);
+    set_if!(data_assinatura);
+    set_if!(observacoes);
+
+    params.push(id.into());
+    let sql = format!("UPDATE termos SET {} WHERE id = ?", sets.join(", "));
+
+    conn.exec_drop(&sql, mysql::Params::Positional(params))
+        .context("Falha ao atualizar termo")?;
+
+    registrar_auditoria_geral(conn, "TERMO_ATUALIZADO", &serde_json::json!({
+        "termo_id": id,
+        "campos": format!("{:?}", dados),
+    }), usuario)?;
+
+    obter_termo(conn, id)
+}
+
+pub fn excluir_termo(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<()> {
+    // termos_ativos cascade on delete
+    conn.exec_drop("DELETE FROM termos WHERE id = ?", (id,))
+        .context("Falha ao excluir termo")?;
+
+    registrar_auditoria_geral(conn, "TERMO_EXCLUIDO", &serde_json::json!({
+        "termo_id": id,
+    }), usuario)?;
+
+    Ok(())
+}
+
+// ============================================================
+// Configuração D4Sign
+// ============================================================
+
+pub fn obter_d4sign_config(conn: &mut PooledConn) -> Result<Option<D4SignConfig>> {
+    let row: Option<mysql::Row> = conn.exec_first(
+        "SELECT habilitado, token_api, crypt_key, cofre_uuid, base_url, envio_automatico, mensagem_email, updated_at
+         FROM d4sign_config WHERE id = 1",
+        (),
+    ).context("Falha ao obter config D4Sign")?;
+
+    Ok(row.map(|r| {
+        let habilitado: i32 = r.get(0).unwrap_or(0);
+        let envio_automatico: i32 = r.get(5).unwrap_or(0);
+        D4SignConfig {
+            habilitado: habilitado != 0,
+            token_api: r.get(1).unwrap_or_default(),
+            crypt_key: r.get(2).unwrap_or_default(),
+            cofre_uuid: r.get(3).unwrap_or_default(),
+            base_url: r.get(4).unwrap_or_default(),
+            envio_automatico: envio_automatico != 0,
+            mensagem_email: r.get(6),
+            updated_at: r.get(7).unwrap_or_default(),
+        }
+    }))
+}
+
+pub fn salvar_d4sign_config(conn: &mut PooledConn, dados: &SaveD4SignConfigDto) -> Result<D4SignConfig> {
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let base_url = dados.base_url.as_deref().unwrap_or("https://sandbox.d4sign.com.br/api/v1");
+
+    conn.exec_drop(
+        "INSERT INTO d4sign_config (id, habilitado, token_api, crypt_key, cofre_uuid, base_url, envio_automatico, mensagem_email, updated_at)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+            habilitado = VALUES(habilitado),
+            token_api = VALUES(token_api),
+            crypt_key = VALUES(crypt_key),
+            cofre_uuid = VALUES(cofre_uuid),
+            base_url = VALUES(base_url),
+            envio_automatico = VALUES(envio_automatico),
+            mensagem_email = VALUES(mensagem_email),
+            updated_at = VALUES(updated_at)",
+        (
+            dados.habilitado as i32,
+            &dados.token_api,
+            &dados.crypt_key,
+            &dados.cofre_uuid,
+            base_url,
+            dados.envio_automatico as i32,
+            &dados.mensagem_email,
+            &now,
+        ),
+    ).context("Falha ao salvar config D4Sign")?;
+
+    obter_d4sign_config(conn)?.ok_or_else(|| anyhow!("Config nao encontrada apos salvar"))
+}
+
+// ============================================================
+// Helpers — termos
+// ============================================================
+
+fn row_to_termo(r: mysql::Row) -> Termo {
+    Termo {
+        id: r.get(0).unwrap_or_default(),
+        colaborador_id: r.get(1),
+        colaborador_nome: r.get(2).unwrap_or_default(),
+        colaborador_email: r.get(3),
+        tipo: r.get(4).unwrap_or_default(),
+        status: r.get(5).unwrap_or_default(),
+        responsavel: r.get(6).unwrap_or_default(),
+        observacoes: r.get(7),
+        arquivo_gerado: r.get(8),
+        arquivo_assinado: r.get(9),
+        d4sign_uuid: r.get(10),
+        d4sign_status: r.get(11),
+        d4sign_enviado_em: r.get(12),
+        data_geracao: r.get(13).unwrap_or_default(),
+        data_assinatura: r.get(14),
+        created_at: r.get(15).unwrap_or_default(),
+        updated_at: r.get(16).unwrap_or_default(),
+        ativos: None,
+    }
+}
+
+fn row_to_termo_ativo(r: mysql::Row) -> TermoAtivo {
+    TermoAtivo {
+        id: r.get(0).unwrap_or_default(),
+        termo_id: r.get(1).unwrap_or_default(),
+        asset_id: r.get(2).unwrap_or_default(),
+        created_at: r.get(3).unwrap_or_default(),
+        service_tag: r.get(4),
+        equipment_type: r.get(5),
+        model: r.get(6),
+        branch_name: r.get(7),
+    }
+}
+
+/// Registra auditoria geral (não vinculada a um ativo específico)
+fn registrar_auditoria_geral(
+    conn: &mut PooledConn,
+    acao: &str,
+    detalhes: &serde_json::Value,
+    usuario: &str,
+) -> Result<()> {
+    // Usa asset_id fictício para eventos gerais
+    let audit_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let json = serde_json::json!({
+        "acao": acao,
+        "detalhes": detalhes,
+    });
+    conn.exec_drop(
+        "INSERT INTO asset_audit (id, asset_id, changed_at, changes_json, changed_by)
+         VALUES (?, '__sistema__', ?, ?, ?)",
+        (&audit_id, &now, &json.to_string(), usuario),
+    )?;
+    Ok(())
+}

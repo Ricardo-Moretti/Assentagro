@@ -458,3 +458,92 @@ pub struct CreateNotaDto {
     pub categoria: String,
     pub autor: String,
 }
+
+// ============================================================
+// Termos de responsabilidade
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Termo {
+    pub id: String,
+    pub colaborador_id: Option<String>,
+    pub colaborador_nome: String,
+    pub colaborador_email: Option<String>,
+    pub tipo: String,           // ENTREGA | DEVOLUCAO | TROCA
+    pub status: String,         // PENDENTE | GERADO | ENVIADO | ASSINADO | RECUSADO
+    pub responsavel: String,
+    pub observacoes: Option<String>,
+    pub arquivo_gerado: Option<String>,
+    pub arquivo_assinado: Option<String>,
+    pub d4sign_uuid: Option<String>,
+    pub d4sign_status: Option<String>,
+    pub d4sign_enviado_em: Option<String>,
+    pub data_geracao: String,
+    pub data_assinatura: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    // Joined: ativos vinculados
+    pub ativos: Option<Vec<TermoAtivo>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TermoAtivo {
+    pub id: String,
+    pub termo_id: String,
+    pub asset_id: String,
+    pub service_tag: Option<String>,
+    pub equipment_type: Option<String>,
+    pub model: Option<String>,
+    pub branch_name: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateTermoDto {
+    pub colaborador_id: Option<String>,
+    pub colaborador_nome: String,
+    pub colaborador_email: Option<String>,
+    pub asset_ids: Vec<String>,
+    pub tipo: String,
+    pub responsavel: String,
+    pub observacoes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateTermoDto {
+    pub status: Option<String>,
+    pub arquivo_gerado: Option<String>,
+    pub arquivo_assinado: Option<String>,
+    pub d4sign_uuid: Option<String>,
+    pub d4sign_status: Option<String>,
+    pub d4sign_enviado_em: Option<String>,
+    pub data_assinatura: Option<String>,
+    pub observacoes: Option<String>,
+}
+
+// ============================================================
+// Configuração D4Sign
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct D4SignConfig {
+    pub habilitado: bool,
+    pub token_api: String,
+    pub crypt_key: String,
+    pub cofre_uuid: String,
+    pub base_url: String,
+    pub envio_automatico: bool,
+    pub mensagem_email: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveD4SignConfigDto {
+    pub habilitado: bool,
+    pub token_api: String,
+    pub crypt_key: String,
+    pub cofre_uuid: String,
+    pub base_url: Option<String>,
+    pub envio_automatico: bool,
+    pub mensagem_email: Option<String>,
+}

@@ -729,3 +729,247 @@ pub fn restaurar_ativo(
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
     queries::restaurar_ativo(&mut conn, &id, &usuario).map_err(err)
 }
+
+// ============================================================
+// Termos de responsabilidade
+// ============================================================
+
+#[tauri::command]
+pub fn criar_termo(
+    state: State<'_, AppState>,
+    dados: CreateTermoDto,
+    usuario: String,
+) -> Result<Termo, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::criar_termo(&mut conn, &dados, &usuario).map_err(err)
+}
+
+#[tauri::command]
+pub fn obter_termo(state: State<'_, AppState>, id: String) -> Result<Termo, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::obter_termo(&mut conn, &id).map_err(err)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn listar_termos(
+    state: State<'_, AppState>,
+    status: Option<String>,
+    tipo: Option<String>,
+) -> Result<Vec<Termo>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_termos(&mut conn, status.as_deref(), tipo.as_deref()).map_err(err)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn listar_termos_por_ativo(
+    state: State<'_, AppState>,
+    asset_id: String,
+) -> Result<Vec<Termo>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_termos_por_ativo(&mut conn, &asset_id).map_err(err)
+}
+
+#[tauri::command]
+pub fn atualizar_termo(
+    state: State<'_, AppState>,
+    id: String,
+    dados: UpdateTermoDto,
+    usuario: String,
+) -> Result<Termo, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::atualizar_termo(&mut conn, &id, &dados, &usuario).map_err(err)
+}
+
+#[tauri::command]
+pub fn excluir_termo(state: State<'_, AppState>, id: String, usuario: String) -> Result<(), String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::excluir_termo(&mut conn, &id, &usuario).map_err(err)
+}
+
+// ============================================================
+// Configuração D4Sign
+// ============================================================
+
+#[tauri::command]
+pub fn obter_d4sign_config(state: State<'_, AppState>) -> Result<Option<D4SignConfig>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::obter_d4sign_config(&mut conn).map_err(err)
+}
+
+#[tauri::command]
+pub fn salvar_d4sign_config(
+    state: State<'_, AppState>,
+    dados: SaveD4SignConfigDto,
+) -> Result<D4SignConfig, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::salvar_d4sign_config(&mut conn, &dados).map_err(err)
+}
+
+#[tauri::command]
+pub async fn d4sign_testar_conexao(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let url = format!("{}/account?tokenAPI={}&cryptKey={}", config.base_url, config.token_api, config.crypt_key);
+    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro de conexao: {}", e))?;
+    let status = resp.status();
+    let body = resp.text().await.map_err(|e| format!("Erro ao ler resposta: {}", e))?;
+
+    if status.is_success() {
+        Ok(body)
+    } else {
+        Err(format!("D4Sign retornou {}: {}", status, body))
+    }
+}
+
+#[tauri::command]
+pub async fn d4sign_listar_cofres(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let url = format!("{}/safes?tokenAPI={}&cryptKey={}", config.base_url, config.token_api, config.crypt_key);
+    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro: {}", e))?;
+    let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
+    Ok(body)
+}
+
+#[tauri::command]
+pub async fn d4sign_upload_documento(
+    state: State<'_, AppState>,
+    filepath: String,
+    filename: String,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let file_bytes = std::fs::read(&filepath).map_err(|e| format!("Erro ao ler arquivo: {}", e))?;
+    let part = reqwest::multipart::Part::bytes(file_bytes)
+        .file_name(filename)
+        .mime_str("application/pdf").map_err(|e| e.to_string())?;
+
+    let form = reqwest::multipart::Form::new().part("file", part);
+
+    let url = format!(
+        "{}/documents/{}/upload?tokenAPI={}&cryptKey={}",
+        config.base_url, config.cofre_uuid, config.token_api, config.crypt_key
+    );
+
+    let client = reqwest::Client::new();
+    let resp = client.post(&url).multipart(form).send().await.map_err(|e| format!("Erro: {}", e))?;
+    let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
+    Ok(body)
+}
+
+#[tauri::command]
+pub async fn d4sign_adicionar_signatario(
+    state: State<'_, AppState>,
+    documento_uuid: String,
+    email: String,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let url = format!(
+        "{}/documents/{}/createlist?tokenAPI={}&cryptKey={}",
+        config.base_url, documento_uuid, config.token_api, config.crypt_key
+    );
+
+    let payload = serde_json::json!({
+        "signers": [{
+            "email": email,
+            "act": "1",
+            "certificadoicpbr": "0",
+            "embed_methodauth": "email",
+        }]
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client.post(&url)
+        .json(&payload)
+        .send().await.map_err(|e| format!("Erro: {}", e))?;
+    let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
+    Ok(body)
+}
+
+#[tauri::command]
+pub async fn d4sign_enviar_para_assinatura(
+    state: State<'_, AppState>,
+    documento_uuid: String,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let url = format!(
+        "{}/documents/{}/sendtosigner?tokenAPI={}&cryptKey={}",
+        config.base_url, documento_uuid, config.token_api, config.crypt_key
+    );
+
+    let msg = config.mensagem_email.unwrap_or_else(|| "Prezado(a), segue o termo para assinatura digital.".to_string());
+    let payload = serde_json::json!({
+        "message": msg,
+        "skip_email": "0",
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client.post(&url)
+        .json(&payload)
+        .send().await.map_err(|e| format!("Erro: {}", e))?;
+    let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
+    Ok(body)
+}
+
+#[tauri::command]
+pub async fn d4sign_consultar_status(
+    state: State<'_, AppState>,
+    documento_uuid: String,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let url = format!(
+        "{}/documents/{}?tokenAPI={}&cryptKey={}",
+        config.base_url, documento_uuid, config.token_api, config.crypt_key
+    );
+
+    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro: {}", e))?;
+    let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
+    Ok(body)
+}
+
+#[tauri::command]
+pub async fn d4sign_baixar_assinado(
+    state: State<'_, AppState>,
+    documento_uuid: String,
+    destino: String,
+) -> Result<String, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    let config = queries::obter_d4sign_config(&mut conn)
+        .map_err(err)?
+        .ok_or("D4Sign nao configurado")?;
+
+    let url = format!(
+        "{}/documents/{}/download?tokenAPI={}&cryptKey={}",
+        config.base_url, documento_uuid, config.token_api, config.crypt_key
+    );
+
+    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro: {}", e))?;
+    let bytes = resp.bytes().await.map_err(|e| format!("Erro: {}", e))?;
+    std::fs::write(&destino, &bytes).map_err(|e| format!("Erro ao salvar: {}", e))?;
+    Ok(destino)
+}

@@ -18,6 +18,7 @@ import {
   Trash2,
   UserX,
   RotateCcw,
+  FileSignature,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/useAppStore';
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { view: 'loans', label: 'Empréstimos', icon: <ArrowRightLeft className="h-5 w-5" /> },
   { view: 'notes', label: 'Observações', icon: <StickyNote className="h-5 w-5" /> },
   { view: 'desligados', label: 'Desligados', icon: <UserX className="h-5 w-5" /> },
+  { view: 'termos', label: 'Termos', icon: <FileSignature className="h-5 w-5" /> },
   { view: 'disposal', label: 'Descarte', icon: <Trash2 className="h-5 w-5" /> },
   { view: 'trash', label: 'Lixeira', icon: <RotateCcw className="h-5 w-5" /> },
   { view: 'users', label: 'Usuários', icon: <Users className="h-5 w-5" /> },
