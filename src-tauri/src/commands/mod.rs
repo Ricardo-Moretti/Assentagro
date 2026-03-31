@@ -529,6 +529,10 @@ pub fn desativar_usuario(state: State<'_, AppState>, id: String, role: String) -
 
 #[tauri::command]
 pub fn escrever_arquivo(caminho: String, dados: Vec<u8>) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&caminho).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Falha ao criar diretório: {}", e))?;
+    }
     std::fs::write(&caminho, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
 }
 
