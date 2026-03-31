@@ -896,6 +896,9 @@ pub async fn d4sign_adicionar_signatario(
             "act": "1",
             "foreign": "0",
             "certificadoicpbr": "0",
+            "assinatura_presencial": "0",
+            "docauth": "0",
+            "docauthandselfie": "0",
             "embed_methodauth": "email",
         }]
     });
@@ -927,6 +930,7 @@ pub async fn d4sign_enviar_para_assinatura(
     let payload = serde_json::json!({
         "message": msg,
         "skip_email": "0",
+        "workflow": "0",
     });
 
     let client = reqwest::Client::new();
