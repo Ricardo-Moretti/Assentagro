@@ -1,6 +1,6 @@
 [package]
 name = "assetagro"
-version = "1.7.4"
+version = "1.7.5"
 edition = "2021"
 description = "Gestão de ativos de TI para filiais — Tracbel Agro"
 

@@ -2895,6 +2895,7 @@ pub fn atualizar_termo(
         };
     }
     set_if!(status);
+    set_if!(colaborador_email);
     set_if!(arquivo_gerado);
     set_if!(arquivo_assinado);
     set_if!(d4sign_uuid);

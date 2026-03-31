@@ -43,9 +43,28 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
   const [sending, setSending] = useState(false);
   const [checking, setChecking] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [editEmail, setEditEmail] = useState(termo.colaborador_email ?? '');
+  const [editObs, setEditObs] = useState(termo.observacoes ?? '');
+  const [savingEdit, setSavingEdit] = useState(false);
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
   const sc = STATUS_CONFIG[termo.status as StatusTermo] ?? STATUS_CONFIG.PENDENTE;
+
+  const handleSalvarDados = async () => {
+    setSavingEdit(true);
+    try {
+      await atualizarTermo(termo.id, {
+        colaborador_email: editEmail.trim() || undefined,
+        observacoes: editObs.trim() || undefined,
+      }, user?.name ?? 'admin');
+      toast('success', 'Dados atualizados');
+      await onRefresh();
+    } catch (e) {
+      toast('error', `Erro: ${e}`);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleGerarPdf = async () => {
     setGenerating(true);
@@ -188,9 +207,28 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
               <span className="text-xs text-slate-500">Colaborador</span>
               <p className="font-medium text-slate-900 dark:text-white">{termo.colaborador_nome}</p>
             </div>
-            <div>
-              <span className="text-xs text-slate-500">Email</span>
-              <p className="text-slate-700 dark:text-slate-300">{termo.colaborador_email ?? '\u2014'}</p>
+            <div className="col-span-2">
+              <span className="text-xs text-slate-500">Email do colaborador (para D4Sign)</span>
+              {termo.status === 'ASSINADO' ? (
+                <p className="text-slate-700 dark:text-slate-300">{termo.colaborador_email ?? '\u2014'}</p>
+              ) : (
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="email"
+                    placeholder="email@empresa.com.br"
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSalvarDados}
+                    disabled={savingEdit}
+                  >
+                    {savingEdit ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </div>
+              )}
             </div>
             <div>
               <span className="text-xs text-slate-500">Tipo</span>
@@ -210,12 +248,22 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
             </div>
           </div>
 
-          {termo.observacoes && (
-            <div>
-              <span className="text-xs text-slate-500">Observacoes</span>
-              <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">{termo.observacoes}</p>
-            </div>
-          )}
+          {/* Observacoes editaveis */}
+          <div>
+            <span className="text-xs text-slate-500">Observacoes</span>
+            {termo.status === 'ASSINADO' ? (
+              <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">{termo.observacoes ?? '\u2014'}</p>
+            ) : (
+              <textarea
+                rows={2}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                value={editObs}
+                onChange={(e) => setEditObs(e.target.value)}
+                onBlur={handleSalvarDados}
+                placeholder="Observacoes sobre o termo..."
+              />
+            )}
+          </div>
 
           {/* Ativos vinculados */}
           {termo.ativos && termo.ativos.length > 0 && (

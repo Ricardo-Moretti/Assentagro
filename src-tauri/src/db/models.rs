@@ -512,6 +512,7 @@ pub struct CreateTermoDto {
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateTermoDto {
     pub status: Option<String>,
+    pub colaborador_email: Option<String>,
     pub arquivo_gerado: Option<String>,
     pub arquivo_assinado: Option<String>,
     pub d4sign_uuid: Option<String>,

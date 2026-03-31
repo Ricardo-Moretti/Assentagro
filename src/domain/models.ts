@@ -473,6 +473,7 @@ export interface CreateTermoDto {
 
 export interface UpdateTermoDto {
   status?: StatusTermo;
+  colaborador_email?: string;
   arquivo_gerado?: string;
   arquivo_assinado?: string;
   d4sign_uuid?: string;
