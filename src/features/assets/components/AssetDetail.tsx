@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Trash2, QrCode } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge, TypeBadge, StorageBadge } from '@/components/ui/Badge';
 import { SafeConfirmDialog } from '@/components/ui/Dialog';
@@ -8,13 +9,13 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRBAC } from '@/hooks/useRBAC';
-import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo } from '@/data/commands';
+import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo } from '@/data/commands';
 import { AttachmentManager } from './AttachmentManager';
 import { AssetTimeline } from './AssetTimeline';
 import { QRCodeLabel } from './QRCodeLabel';
 import { formatDateTime, formatStorage } from '@/lib/utils';
 import { UserX } from 'lucide-react';
-import type { Asset, Movement, AssetAttachment, Desligamento } from '@/domain/models';
+import type { Asset, Movement, AssetAttachment, Desligamento, Termo } from '@/domain/models';
 
 export const AssetDetail: React.FC = () => {
   const { detailAssetId, navigateTo, editAsset } = useAppStore();
@@ -24,10 +25,12 @@ export const AssetDetail: React.FC = () => {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [attachments, setAttachments] = useState<AssetAttachment[]>([]);
   const [desligamentos, setDesligamentos] = useState<Desligamento[]>([]);
+  const [termos, setTermos] = useState<Termo[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDelete, setShowDelete] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [creatingTermo, setCreatingTermo] = useState(false);
 
   const loadData = async () => {
     if (!detailAssetId) return;
@@ -57,6 +60,12 @@ export const AssetDetail: React.FC = () => {
     } catch {
       setDesligamentos([]);
     }
+    try {
+      const t = await listarTermosPorAtivo(detailAssetId);
+      setTermos(t);
+    } catch {
+      setTermos([]);
+    }
     setLoading(false);
   };
 
@@ -82,6 +91,29 @@ export const AssetDetail: React.FC = () => {
     }
   };
 
+  const handleGerarTermo = async () => {
+    if (!asset || !asset.employee_name) return;
+    setCreatingTermo(true);
+    try {
+      const userName = useAuthStore.getState().user?.name ?? 'admin';
+      await criarTermo(
+        {
+          colaborador_nome: asset.employee_name,
+          asset_ids: [asset.id],
+          tipo: 'ENTREGA',
+          responsavel: userName,
+        },
+        userName,
+      );
+      toast('success', `Termo de entrega criado para ${asset.employee_name}`);
+      loadData();
+    } catch (e) {
+      toast('error', `Erro ao criar termo: ${e}`);
+    } finally {
+      setCreatingTermo(false);
+    }
+  };
+
   if (loading) return <LoadingState />;
   if (!asset) return null;
 
@@ -98,6 +130,17 @@ export const AssetDetail: React.FC = () => {
           Voltar
         </Button>
         <div className="flex gap-2">
+          {asset.employee_name && asset.status === 'IN_USE' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<FileSignature className="h-4 w-4" />}
+              onClick={handleGerarTermo}
+              disabled={creatingTermo}
+            >
+              {creatingTermo ? 'Gerando...' : 'Gerar Termo'}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -218,6 +261,53 @@ export const AssetDetail: React.FC = () => {
 
       {/* Timeline unificada */}
       <AssetTimeline assetId={asset.id} movements={movements} />
+
+      {/* Termos de responsabilidade */}
+      {termos.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-indigo-200 dark:border-indigo-800/40 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <FileSignature className="h-4 w-4 text-indigo-600" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Termos de Responsabilidade ({termos.length})
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {termos.map((t) => {
+              const statusMap: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+                PENDENTE: { label: 'Pendente', color: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800', icon: <Clock className="w-3 h-3" /> },
+                GERADO: { label: 'PDF Gerado', color: 'text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/30', icon: <FileText className="w-3 h-3" /> },
+                ENVIADO: { label: 'Enviado', color: 'text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/30', icon: <Send className="w-3 h-3" /> },
+                ASSINADO: { label: 'Assinado', color: 'text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/30', icon: <CheckCircle2 className="w-3 h-3" /> },
+                RECUSADO: { label: 'Recusado', color: 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30', icon: <XCircle className="w-3 h-3" /> },
+              };
+              const sc = statusMap[t.status] ?? statusMap.PENDENTE;
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      Termo de {t.tipo === 'ENTREGA' ? 'Entrega' : t.tipo === 'DEVOLUCAO' ? 'Devolucao' : 'Troca'}
+                      <span className="text-slate-400 ml-2 font-normal">
+                        {t.colaborador_nome}
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {new Date(t.data_geracao).toLocaleDateString('pt-BR')}
+                      {t.responsavel && <> {' \u2014 '} por {t.responsavel}</>}
+                      {t.data_assinatura && <> {' \u2014 '} Assinado em {new Date(t.data_assinatura).toLocaleDateString('pt-BR')}</>}
+                    </p>
+                  </div>
+                  <span className={cn('inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium', sc.color)}>
+                    {sc.icon} {sc.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Anexos */}
       <AttachmentManager
