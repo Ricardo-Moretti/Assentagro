@@ -18,7 +18,7 @@ import {
 } from '@/data/commands';
 import { gerarPdfTermo } from './gerarPdfTermo';
 import { appDataDir } from '@tauri-apps/api/path';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { readFile } from '@tauri-apps/plugin-fs';
 import type { Termo, StatusTermo } from '@/domain/models';
 
 interface Props {
@@ -47,7 +47,7 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
   const [editEmail, setEditEmail] = useState(termo.colaborador_email ?? '');
   const [editObs, setEditObs] = useState(termo.observacoes ?? '');
   const [savingEdit, setSavingEdit] = useState(false);
-  const [showPdf, setShowPdf] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
   const sc = STATUS_CONFIG[termo.status as StatusTermo] ?? STATUS_CONFIG.PENDENTE;
@@ -343,7 +343,16 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
               <Button
                 variant="secondary"
                 className="w-full"
-                onClick={() => setShowPdf(true)}
+                onClick={async () => {
+                  try {
+                    const bytes = await readFile(termo.arquivo_gerado!);
+                    const blob = new Blob([bytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    setPdfBlobUrl(url);
+                  } catch (e) {
+                    toast('error', `Erro ao abrir PDF: ${e}`);
+                  }
+                }}
               >
                 <Eye className="w-4 h-4 mr-2" /> Visualizar PDF
               </Button>
@@ -378,7 +387,7 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
       </div>
 
       {/* Modal PDF Viewer */}
-      {showPdf && termo.arquivo_gerado && (
+      {pdfBlobUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-[90vw] h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700">
@@ -386,17 +395,17 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
                 Termo — {termo.colaborador_nome}
               </h3>
               <button
-                onClick={() => setShowPdf(false)}
+                onClick={() => { URL.revokeObjectURL(pdfBlobUrl); setPdfBlobUrl(null); }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-2xl leading-none"
               >
                 &times;
               </button>
             </div>
             <div className="flex-1">
-              <iframe
-                src={convertFileSrc(termo.arquivo_gerado)}
-                className="w-full h-full border-0"
-                title="Visualizacao do Termo"
+              <embed
+                src={pdfBlobUrl}
+                type="application/pdf"
+                className="w-full h-full"
               />
             </div>
           </div>
