@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # --- Configurações ---
-$Version      = "1.7.7"   # <-- atualizar junto com tauri.conf.json e Cargo.toml
+$Version      = "1.7.8"   # <-- atualizar junto com tauri.conf.json e Cargo.toml
 $ServerHost   = "192.168.90.5"
 $ServerPort   = 8765
 $ServerShare  = "\\$ServerHost\AssetAgro\updates"   # ajustar se necessário

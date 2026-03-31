@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft, Send, Download, FileText, CheckCircle2,
-  Clock, XCircle, RefreshCw, FileDown,
+  Clock, XCircle, RefreshCw, FileDown, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +18,7 @@ import {
 } from '@/data/commands';
 import { gerarPdfTermo } from './gerarPdfTermo';
 import { appDataDir } from '@tauri-apps/api/path';
+import { open } from '@tauri-apps/plugin-shell';
 import type { Termo, StatusTermo } from '@/domain/models';
 
 interface Props {
@@ -125,10 +126,12 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
       if (!docUuid) throw new Error('UUID do documento nao retornado pelo D4Sign');
 
       // 2. Adicionar signatario
-      await d4signAdicionarSignatario(docUuid, termo.colaborador_email);
+      const sigResp = await d4signAdicionarSignatario(docUuid, termo.colaborador_email);
+      console.log('[D4Sign] Signatario resp:', sigResp);
 
       // 3. Enviar para assinatura
-      await d4signEnviarParaAssinatura(docUuid);
+      const sendResp = await d4signEnviarParaAssinatura(docUuid);
+      console.log('[D4Sign] Enviar resp:', sendResp);
 
       // 4. Atualizar termo no banco
       const now = new Date().toISOString();
@@ -334,11 +337,15 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
               </Button>
             )}
 
-            {/* PDF gerado - info */}
+            {/* Visualizar PDF */}
             {termo.arquivo_gerado && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> PDF gerado
-              </p>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => open(termo.arquivo_gerado!)}
+              >
+                <Eye className="w-4 h-4 mr-2" /> Visualizar PDF
+              </Button>
             )}
 
             {termo.status === 'ENVIADO' && termo.d4sign_uuid && (
