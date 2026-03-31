@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileSignature, Plus, Search, Eye, Trash2, Send, RefreshCw,
-  CheckCircle2, Clock, FileText, XCircle,
+  CheckCircle2, Clock, FileText, XCircle, Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import {
 import type { Termo, StatusTermo, TipoTermo } from '@/domain/models';
 import { TermoForm } from '../components/TermoForm';
 import { TermoDetail } from '../components/TermoDetail';
+import { D4SignConfigPanel } from '../components/D4SignConfigPanel';
 
 const TIPO_LABEL: Record<TipoTermo, string> = {
   ENTREGA: 'Entrega',
@@ -69,6 +70,7 @@ export const TermosPage: React.FC = () => {
   const [tipoFilter, setTipoFilter] = useState<string>('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<Termo | null>(null);
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
@@ -117,6 +119,10 @@ export const TermosPage: React.FC = () => {
     );
   });
 
+  if (showConfig) {
+    return <D4SignConfigPanel onBack={() => setShowConfig(false)} />;
+  }
+
   if (selectedTermo) {
     return (
       <TermoDetail
@@ -154,9 +160,14 @@ export const TermosPage: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="w-4 h-4 mr-2" /> Novo Termo
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowConfig(true)}>
+            <Settings className="w-4 h-4 mr-2" /> D4Sign
+          </Button>
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Novo Termo
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}

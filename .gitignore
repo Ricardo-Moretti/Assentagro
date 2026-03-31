@@ -35,3 +35,4 @@ src-tauri/*.key.pub.bak
 
 # Config com credenciais de banco (nunca versionar)
 db_config.json
+collector/target/

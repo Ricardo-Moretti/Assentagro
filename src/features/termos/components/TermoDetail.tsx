@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft, Send, Download, FileText, CheckCircle2,
-  Clock, XCircle, RefreshCw,
+  Clock, XCircle, RefreshCw, FileDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -9,12 +9,15 @@ import { useToast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   atualizarTermo,
+  escreverArquivo,
   d4signUploadDocumento,
   d4signAdicionarSignatario,
   d4signEnviarParaAssinatura,
   d4signConsultarStatus,
   d4signBaixarAssinado,
 } from '@/data/commands';
+import { gerarPdfTermo } from './gerarPdfTermo';
+import { appDataDir } from '@tauri-apps/api/path';
 import type { Termo, StatusTermo } from '@/domain/models';
 
 interface Props {
@@ -39,9 +42,51 @@ const STATUS_CONFIG: Record<StatusTermo, { label: string; color: string; icon: R
 export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
   const [sending, setSending] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
   const sc = STATUS_CONFIG[termo.status as StatusTermo] ?? STATUS_CONFIG.PENDENTE;
+
+  const handleGerarPdf = async () => {
+    setGenerating(true);
+    try {
+      const pdfBytes = await gerarPdfTermo({
+        colaborador_nome: termo.colaborador_nome,
+        colaborador_email: termo.colaborador_email ?? undefined,
+        tipo: termo.tipo,
+        responsavel: termo.responsavel,
+        observacoes: termo.observacoes ?? undefined,
+        data_geracao: termo.data_geracao,
+        ativos: (termo.ativos ?? []).map((a) => ({
+          service_tag: a.service_tag,
+          equipment_type: a.equipment_type,
+          model: a.model,
+          branch_name: a.branch_name,
+        })),
+      });
+
+      // Salvar PDF no disco
+      const dir = await appDataDir();
+      const filename = `termo_${termo.id.slice(0, 8)}_${Date.now()}.pdf`;
+      const filepath = `${dir}termos/${filename}`;
+
+      // Criar diretorio e salvar
+      await escreverArquivo(filepath, Array.from(pdfBytes));
+
+      // Atualizar termo no banco
+      await atualizarTermo(termo.id, {
+        status: 'GERADO',
+        arquivo_gerado: filepath,
+      }, user?.name ?? 'admin');
+
+      toast('success', 'PDF gerado com sucesso');
+      await onRefresh();
+    } catch (e) {
+      toast('error', `Erro ao gerar PDF: ${e}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleEnviarD4Sign = async () => {
     if (!termo.arquivo_gerado) {
@@ -217,6 +262,19 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
           )}
 
           <div className="space-y-2">
+            {/* Gerar PDF */}
+            {termo.status === 'PENDENTE' && !termo.arquivo_gerado && (
+              <Button
+                className="w-full"
+                onClick={handleGerarPdf}
+                disabled={generating}
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                {generating ? 'Gerando PDF...' : 'Gerar PDF do Termo'}
+              </Button>
+            )}
+
+            {/* Enviar para D4Sign */}
             {(termo.status === 'GERADO' || termo.status === 'PENDENTE') && termo.arquivo_gerado && (
               <Button
                 className="w-full"
@@ -226,6 +284,13 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
                 <Send className="w-4 h-4 mr-2" />
                 {sending ? 'Enviando...' : 'Enviar para D4Sign'}
               </Button>
+            )}
+
+            {/* PDF gerado - info */}
+            {termo.arquivo_gerado && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> PDF gerado
+              </p>
             )}
 
             {termo.status === 'ENVIADO' && termo.d4sign_uuid && (
