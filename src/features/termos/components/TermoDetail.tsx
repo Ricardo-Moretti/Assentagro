@@ -89,7 +89,8 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
       // Salvar PDF no disco
       const dir = await appDataDir();
       const filename = `termo_${termo.id.slice(0, 8)}_${Date.now()}.pdf`;
-      const filepath = `${dir}termos/${filename}`;
+      const sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '/';
+      const filepath = `${dir}${sep}termos/${filename}`;
 
       // Criar diretorio e salvar
       await escreverArquivo(filepath, Array.from(pdfBytes));
