@@ -894,6 +894,7 @@ pub async fn d4sign_adicionar_signatario(
         "signers": [{
             "email": email,
             "act": "1",
+            "foreign": "0",
             "certificadoicpbr": "0",
             "embed_methodauth": "email",
         }]
