@@ -2786,12 +2786,15 @@ pub fn criar_termo(
         ).context("Falha ao vincular ativo ao termo")?;
     }
 
-    registrar_auditoria_geral(conn, "TERMO_CRIADO", &serde_json::json!({
-        "termo_id": id,
-        "colaborador": dados.colaborador_nome,
-        "tipo": dados.tipo,
-        "ativos": dados.asset_ids,
-    }), usuario)?;
+    // Registra auditoria em cada ativo vinculado
+    for asset_id in &dados.asset_ids {
+        registrar_auditoria(conn, asset_id, &serde_json::json!({
+            "acao": "TERMO_CRIADO",
+            "termo_id": id,
+            "colaborador": dados.colaborador_nome,
+            "tipo": dados.tipo,
+        }), usuario)?;
+    }
 
     obter_termo(conn, &id)
 }
@@ -2906,22 +2909,35 @@ pub fn atualizar_termo(
     conn.exec_drop(&sql, mysql::Params::Positional(params))
         .context("Falha ao atualizar termo")?;
 
-    registrar_auditoria_geral(conn, "TERMO_ATUALIZADO", &serde_json::json!({
-        "termo_id": id,
-        "campos": format!("{:?}", dados),
-    }), usuario)?;
+    // Auditoria nos ativos vinculados
+    let asset_ids: Vec<String> = conn.exec(
+        "SELECT asset_id FROM termos_ativos WHERE termo_id = ?", (id,),
+    ).unwrap_or_default();
+    for aid in &asset_ids {
+        let _ = registrar_auditoria(conn, aid, &serde_json::json!({
+            "acao": "TERMO_ATUALIZADO",
+            "termo_id": id,
+        }), usuario);
+    }
 
     obter_termo(conn, id)
 }
 
 pub fn excluir_termo(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<()> {
-    // termos_ativos cascade on delete
+    // Buscar ativos antes de deletar (cascade vai apagar termos_ativos)
+    let asset_ids: Vec<String> = conn.exec(
+        "SELECT asset_id FROM termos_ativos WHERE termo_id = ?", (id,),
+    ).unwrap_or_default();
+
     conn.exec_drop("DELETE FROM termos WHERE id = ?", (id,))
         .context("Falha ao excluir termo")?;
 
-    registrar_auditoria_geral(conn, "TERMO_EXCLUIDO", &serde_json::json!({
-        "termo_id": id,
-    }), usuario)?;
+    for aid in &asset_ids {
+        let _ = registrar_auditoria(conn, aid, &serde_json::json!({
+            "acao": "TERMO_EXCLUIDO",
+            "termo_id": id,
+        }), usuario);
+    }
 
     Ok(())
 }
@@ -3024,24 +3040,4 @@ fn row_to_termo_ativo(r: mysql::Row) -> TermoAtivo {
     }
 }
 
-/// Registra auditoria geral (não vinculada a um ativo específico)
-fn registrar_auditoria_geral(
-    conn: &mut PooledConn,
-    acao: &str,
-    detalhes: &serde_json::Value,
-    usuario: &str,
-) -> Result<()> {
-    // Usa asset_id fictício para eventos gerais
-    let audit_id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    let json = serde_json::json!({
-        "acao": acao,
-        "detalhes": detalhes,
-    });
-    conn.exec_drop(
-        "INSERT INTO asset_audit (id, asset_id, changed_at, changes_json, changed_by)
-         VALUES (?, '__sistema__', ?, ?, ?)",
-        (&audit_id, &now, &json.to_string(), usuario),
-    )?;
-    Ok(())
-}
+
