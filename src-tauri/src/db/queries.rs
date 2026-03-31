@@ -3004,39 +3004,47 @@ pub fn salvar_d4sign_config(conn: &mut PooledConn, dados: &SaveD4SignConfigDto) 
 // Helpers — termos
 // ============================================================
 
+fn safe_str(r: &mysql::Row, idx: usize) -> String {
+    r.get::<Option<String>, _>(idx).flatten().unwrap_or_default()
+}
+fn safe_opt(r: &mysql::Row, idx: usize) -> Option<String> {
+    r.get::<Option<String>, _>(idx).flatten()
+}
+
 fn row_to_termo(r: mysql::Row) -> Termo {
-    Termo {
-        id: r.get(0).unwrap_or_default(),
-        colaborador_id: r.get(1),
-        colaborador_nome: r.get(2).unwrap_or_default(),
-        colaborador_email: r.get(3),
-        tipo: r.get(4).unwrap_or_default(),
-        status: r.get(5).unwrap_or_default(),
-        responsavel: r.get(6).unwrap_or_default(),
-        observacoes: r.get(7),
-        arquivo_gerado: r.get(8),
-        arquivo_assinado: r.get(9),
-        d4sign_uuid: r.get(10),
-        d4sign_status: r.get(11),
-        d4sign_enviado_em: r.get(12),
-        data_geracao: r.get(13).unwrap_or_default(),
-        data_assinatura: r.get(14),
-        created_at: r.get(15).unwrap_or_default(),
-        updated_at: r.get(16).unwrap_or_default(),
+    let t = Termo {
+        id: safe_str(&r, 0),
+        colaborador_id: safe_opt(&r, 1),
+        colaborador_nome: safe_str(&r, 2),
+        colaborador_email: safe_opt(&r, 3),
+        tipo: safe_str(&r, 4),
+        status: safe_str(&r, 5),
+        responsavel: safe_str(&r, 6),
+        observacoes: safe_opt(&r, 7),
+        arquivo_gerado: safe_opt(&r, 8),
+        arquivo_assinado: safe_opt(&r, 9),
+        d4sign_uuid: safe_opt(&r, 10),
+        d4sign_status: safe_opt(&r, 11),
+        d4sign_enviado_em: safe_opt(&r, 12),
+        data_geracao: safe_str(&r, 13),
+        data_assinatura: safe_opt(&r, 14),
+        created_at: safe_str(&r, 15),
+        updated_at: safe_str(&r, 16),
         ativos: None,
-    }
+    };
+    t
 }
 
 fn row_to_termo_ativo(r: mysql::Row) -> TermoAtivo {
     TermoAtivo {
-        id: r.get(0).unwrap_or_default(),
-        termo_id: r.get(1).unwrap_or_default(),
-        asset_id: r.get(2).unwrap_or_default(),
-        created_at: r.get(3).unwrap_or_default(),
-        service_tag: r.get(4),
-        equipment_type: r.get(5),
-        model: r.get(6),
-        branch_name: r.get(7),
+        id: safe_str(&r, 0),
+        termo_id: safe_str(&r, 1),
+        asset_id: safe_str(&r, 2),
+        created_at: safe_str(&r, 3),
+        service_tag: safe_opt(&r, 4),
+        equipment_type: safe_opt(&r, 5),
+        model: safe_opt(&r, 6),
+        branch_name: safe_opt(&r, 7),
     }
 }
 
