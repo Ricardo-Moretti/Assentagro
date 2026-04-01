@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
   "productName": "AssetAgro",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "identifier": "com.tracbelagro.assetagro",
   "build": {
     "frontendDist": "../dist",
@@ -49,7 +49,8 @@
       "dangerousInsecureTransportProtocol": true,
       "endpoints": [
         "http://192.168.90.5:8765/latest.json"
-      ]
+      ],
+      "_note": "HTTP usado intencionalmente na rede interna. Migrar para HTTPS quando possivel."
     }
   }
 }

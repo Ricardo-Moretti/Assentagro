@@ -211,7 +211,7 @@ export const SettingsPage: React.FC = () => {
               </div>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Servidor</p>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">192.168.90.5</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Rede interna</p>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Último Acesso</p>

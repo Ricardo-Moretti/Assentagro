@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use mysql::Pool;
+use mysql::{Pool, prelude::Queryable};
 use tauri::State;
 
 use crate::db::models::*;
@@ -20,12 +20,57 @@ fn err(e: anyhow::Error) -> String {
     format!("{:#}", e)
 }
 
-/// Verifica se o usuario tem role admin. Retorna Err se nao.
-fn exigir_admin(role: &str) -> Result<(), String> {
-    if role != "admin" {
+/// Verifica se o usuario tem role admin consultando o banco.
+/// Aceita role do frontend apenas como fallback; valida pelo username quando possível.
+fn exigir_admin_db(conn: &mut mysql::PooledConn, usuario: &str, role_frontend: &str) -> Result<(), String> {
+    // Tentar buscar role real do banco pelo username/name
+    let role_db: Option<String> = conn.exec_first(
+        "SELECT role FROM users WHERE (username = ? OR name = ?) AND active = 1 LIMIT 1",
+        (usuario, usuario),
+    ).unwrap_or(None);
+
+    let role_efetivo = role_db.as_deref().unwrap_or(role_frontend);
+
+    if role_efetivo != "admin" {
         return Err("Acesso negado: esta operacao requer permissao de administrador.".to_string());
     }
     Ok(())
+}
+
+/// Monta URL da API D4Sign com autenticacao via query params.
+/// Usa reqwest::Url para evitar que tokens apareçam em format strings/logs.
+/// Monta URL da API D4Sign com autenticacao. Retorna String para compatibilidade com reqwest.
+fn d4sign_url(config: &D4SignConfig, path: &str) -> Result<String, String> {
+    let base = format!("{}/{}", config.base_url.trim_end_matches('/'), path.trim_start_matches('/'));
+    let mut url = reqwest::Url::parse(&base).map_err(|e| format!("URL invalida: {}", e))?;
+    url.query_pairs_mut()
+        .append_pair("tokenAPI", &config.token_api)
+        .append_pair("cryptKey", &config.crypt_key);
+    Ok(url.to_string())
+}
+
+/// Valida que um caminho de arquivo esta dentro do diretorio seguro do app.
+fn validar_path_seguro(caminho: &str, app_dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let path = std::path::Path::new(caminho);
+    let canonical = if path.exists() {
+        path.canonicalize().map_err(|e| format!("Path invalido: {}", e))?
+    } else {
+        // Se nao existe ainda, verificar que o parent e valido
+        let parent = path.parent().ok_or("Path sem diretorio pai")?;
+        let _ = std::fs::create_dir_all(parent);
+        if parent.exists() {
+            let mut canon = parent.canonicalize().map_err(|e| format!("Path invalido: {}", e))?;
+            canon.push(path.file_name().ok_or("Sem nome de arquivo")?);
+            canon
+        } else {
+            return Err("Diretorio pai nao pode ser criado".to_string());
+        }
+    };
+    let app_canonical = app_dir.canonicalize().unwrap_or_else(|_| app_dir.to_path_buf());
+    if !canonical.starts_with(&app_canonical) {
+        return Err(format!("Acesso negado: path fora do diretorio do app"));
+    }
+    Ok(canonical)
 }
 
 // ============================================================
@@ -76,8 +121,8 @@ pub fn atualizar_ativo(
 
 #[tauri::command]
 pub fn excluir_ativo(state: State<'_, AppState>, id: String, usuario: String, role: String) -> Result<(), String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &usuario, &role)?;
     queries::excluir_ativo(&mut conn, &id, &usuario).map_err(err)
 }
 
@@ -132,8 +177,8 @@ pub fn importar_ativos(
     usuario: String,
     role: String,
 ) -> Result<queries::ImportResult, String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::importar_ativos(&mut conn, &ativos, &modo, &usuario).map_err(err)
 }
 
@@ -143,15 +188,15 @@ pub fn importar_ativos(
 
 #[tauri::command]
 pub fn criar_backup(state: State<'_, AppState>, destino: String, role: String) -> Result<String, String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::criar_backup(&mut conn, &destino).map_err(err)
 }
 
 #[tauri::command]
 pub fn restaurar_backup(state: State<'_, AppState>, origem: String, role: String) -> Result<(), String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::restaurar_backup(&mut conn, &origem).map_err(err)
 }
 
@@ -332,8 +377,8 @@ pub fn baixar_em_lote(
     usuario: String,
     role: String,
 ) -> Result<usize, String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::baixar_em_lote(&mut conn, &asset_ids, &reason, &usuario).map_err(err)
 }
 
@@ -494,8 +539,8 @@ pub fn criar_usuario(
     dados: CreateUserDto,
     role: String,
 ) -> Result<User, String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::criar_usuario(&mut conn, &dados).map_err(err)
 }
 
@@ -511,15 +556,15 @@ pub fn alterar_senha(
     dados: ChangePasswordDto,
     role: String,
 ) -> Result<(), String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::alterar_senha(&mut conn, &dados).map_err(err)
 }
 
 #[tauri::command]
 pub fn desativar_usuario(state: State<'_, AppState>, id: String, role: String) -> Result<(), String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::desativar_usuario(&mut conn, &id).map_err(err)
 }
 
@@ -528,12 +573,14 @@ pub fn desativar_usuario(state: State<'_, AppState>, id: String, role: String) -
 // ============================================================
 
 #[tauri::command]
-pub fn escrever_arquivo(caminho: String, dados: Vec<u8>) -> Result<(), String> {
-    if let Some(parent) = std::path::Path::new(&caminho).parent() {
+pub fn escrever_arquivo(state: State<'_, AppState>, caminho: String, dados: Vec<u8>) -> Result<(), String> {
+    // Validar que o path esta dentro do diretorio do app
+    let safe_path = validar_path_seguro(&caminho, &state.app_dir)?;
+    if let Some(parent) = safe_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Falha ao criar diretório: {}", e))?;
     }
-    std::fs::write(&caminho, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
+    std::fs::write(&safe_path, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
 }
 
 // ============================================================
@@ -729,8 +776,8 @@ pub fn restaurar_ativo(
     usuario: String,
     role: String,
 ) -> Result<Asset, String> {
-    exigir_admin(&role)?;
     let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    exigir_admin_db(&mut conn, &role, &role)?;
     queries::restaurar_ativo(&mut conn, &id, &usuario).map_err(err)
 }
 
@@ -818,8 +865,8 @@ pub async fn d4sign_testar_conexao(
         .map_err(err)?
         .ok_or("D4Sign nao configurado")?;
 
-    let url = format!("{}/account?tokenAPI={}&cryptKey={}", config.base_url, config.token_api, config.crypt_key);
-    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro de conexao: {}", e))?;
+    let url = d4sign_url(&config, "/account")?;
+    let resp = reqwest::get(url).await.map_err(|e| format!("Erro de conexao: {}", e))?;
     let status = resp.status();
     let body = resp.text().await.map_err(|e| format!("Erro ao ler resposta: {}", e))?;
 
@@ -839,8 +886,8 @@ pub async fn d4sign_listar_cofres(
         .map_err(err)?
         .ok_or("D4Sign nao configurado")?;
 
-    let url = format!("{}/safes?tokenAPI={}&cryptKey={}", config.base_url, config.token_api, config.crypt_key);
-    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro: {}", e))?;
+    let url = d4sign_url(&config, "/safes")?;
+    let resp = reqwest::get(url).await.map_err(|e| format!("Erro: {}", e))?;
     let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
     Ok(body)
 }
@@ -863,13 +910,10 @@ pub async fn d4sign_upload_documento(
 
     let form = reqwest::multipart::Form::new().part("file", part);
 
-    let url = format!(
-        "{}/documents/{}/upload?tokenAPI={}&cryptKey={}",
-        config.base_url, config.cofre_uuid, config.token_api, config.crypt_key
-    );
+    let url = d4sign_url(&config, &format!("/documents/{}/upload", config.cofre_uuid))?;
 
     let client = reqwest::Client::new();
-    let resp = client.post(&url).multipart(form).send().await.map_err(|e| format!("Erro: {}", e))?;
+    let resp = client.post(url).multipart(form).send().await.map_err(|e| format!("Erro: {}", e))?;
     let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
     Ok(body)
 }
@@ -885,10 +929,7 @@ pub async fn d4sign_adicionar_signatario(
         .map_err(err)?
         .ok_or("D4Sign nao configurado")?;
 
-    let url = format!(
-        "{}/documents/{}/createlist?tokenAPI={}&cryptKey={}",
-        config.base_url, documento_uuid, config.token_api, config.crypt_key
-    );
+    let url = d4sign_url(&config, &format!("/documents/{}/createlist", documento_uuid))?;
 
     let payload = serde_json::json!({
         "signers": [{
@@ -904,7 +945,7 @@ pub async fn d4sign_adicionar_signatario(
     });
 
     let client = reqwest::Client::new();
-    let resp = client.post(&url)
+    let resp = client.post(url)
         .json(&payload)
         .send().await.map_err(|e| format!("Erro: {}", e))?;
     let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
@@ -921,10 +962,7 @@ pub async fn d4sign_enviar_para_assinatura(
         .map_err(err)?
         .ok_or("D4Sign nao configurado")?;
 
-    let url = format!(
-        "{}/documents/{}/sendtosigner?tokenAPI={}&cryptKey={}",
-        config.base_url, documento_uuid, config.token_api, config.crypt_key
-    );
+    let url = d4sign_url(&config, &format!("/documents/{}/sendtosigner", documento_uuid))?;
 
     let msg = config.mensagem_email.unwrap_or_else(|| "Prezado(a), segue o termo para assinatura digital.".to_string());
     let payload = serde_json::json!({
@@ -934,7 +972,7 @@ pub async fn d4sign_enviar_para_assinatura(
     });
 
     let client = reqwest::Client::new();
-    let resp = client.post(&url)
+    let resp = client.post(url)
         .json(&payload)
         .send().await.map_err(|e| format!("Erro: {}", e))?;
     let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
@@ -951,12 +989,9 @@ pub async fn d4sign_consultar_status(
         .map_err(err)?
         .ok_or("D4Sign nao configurado")?;
 
-    let url = format!(
-        "{}/documents/{}?tokenAPI={}&cryptKey={}",
-        config.base_url, documento_uuid, config.token_api, config.crypt_key
-    );
+    let url = d4sign_url(&config, &format!("/documents/{}", documento_uuid))?;
 
-    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro: {}", e))?;
+    let resp = reqwest::get(url).await.map_err(|e| format!("Erro: {}", e))?;
     let body = resp.text().await.map_err(|e| format!("Erro: {}", e))?;
     Ok(body)
 }
@@ -972,10 +1007,7 @@ pub async fn d4sign_baixar_assinado(
         .map_err(err)?
         .ok_or("D4Sign nao configurado")?;
 
-    let url = format!(
-        "{}/documents/{}/download?tokenAPI={}&cryptKey={}",
-        config.base_url, documento_uuid, config.token_api, config.crypt_key
-    );
+    let url = d4sign_url(&config, &format!("/documents/{}/download", documento_uuid))?;
 
     // 1. POST para obter URL temporaria do PDF
     let client = reqwest::Client::new();

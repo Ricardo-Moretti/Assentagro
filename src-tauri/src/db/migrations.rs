@@ -451,7 +451,7 @@ fn seed_admin_user(conn: &mut PooledConn) -> Result<()> {
         info!("===================================================");
         info!("  USUARIO ADMIN CRIADO");
         info!("  Login:  admin");
-        info!("  Senha:  {}", default_pass);
+        info!("  Senha definida via ASSETAGRO_ADMIN_PASS ou gerada automaticamente.");
         info!("  TROQUE A SENHA IMEDIATAMENTE APOS O PRIMEIRO LOGIN");
         info!("===================================================");
     }

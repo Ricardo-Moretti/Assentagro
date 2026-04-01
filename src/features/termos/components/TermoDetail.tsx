@@ -128,12 +128,10 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
       if (!docUuid) throw new Error('UUID do documento nao retornado pelo D4Sign');
 
       // 2. Adicionar signatario
-      const sigResp = await d4signAdicionarSignatario(docUuid, termo.colaborador_email);
-      console.log('[D4Sign] Signatario resp:', sigResp);
+      await d4signAdicionarSignatario(docUuid, termo.colaborador_email);
 
       // 3. Enviar para assinatura
-      const sendResp = await d4signEnviarParaAssinatura(docUuid);
-      console.log('[D4Sign] Enviar resp:', sendResp);
+      await d4signEnviarParaAssinatura(docUuid);
 
       // 4. Atualizar termo no banco
       const now = new Date().toISOString();
