@@ -372,9 +372,46 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
             )}
 
             {termo.arquivo_assinado && (
-              <Button variant="secondary" className="w-full text-emerald-600">
+              <Button
+                variant="secondary"
+                className="w-full text-emerald-600"
+                onClick={async () => {
+                  try {
+                    const bytes = await readFile(termo.arquivo_assinado!);
+                    const blob = new Blob([bytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    setPdfBlobUrl(url);
+                  } catch (e) {
+                    toast('error', `Erro ao abrir PDF assinado: ${e}`);
+                  }
+                }}
+              >
                 <Download className="w-4 h-4 mr-2" />
-                Baixar Termo Assinado
+                Ver Termo Assinado
+              </Button>
+            )}
+
+            {/* Baixar manualmente se status ASSINADO mas sem arquivo local */}
+            {termo.status === 'ASSINADO' && !termo.arquivo_assinado && termo.d4sign_uuid && (
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    const dir = await appDataDir();
+                    const sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '/';
+                    const destino = `${dir}${sep}termos/termo_${termo.id.slice(0, 8)}_assinado.pdf`;
+                    await d4signBaixarAssinado(termo.d4sign_uuid!, destino);
+                    await atualizarTermo(termo.id, { arquivo_assinado: destino }, user?.name ?? 'admin');
+                    toast('success', 'PDF assinado baixado');
+                    await onRefresh();
+                  } catch (e) {
+                    toast('error', `Erro ao baixar: ${e}`);
+                  }
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar PDF Assinado
               </Button>
             )}
 

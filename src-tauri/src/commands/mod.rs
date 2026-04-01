@@ -977,8 +977,75 @@ pub async fn d4sign_baixar_assinado(
         config.base_url, documento_uuid, config.token_api, config.crypt_key
     );
 
-    let resp = reqwest::get(&url).await.map_err(|e| format!("Erro: {}", e))?;
-    let bytes = resp.bytes().await.map_err(|e| format!("Erro: {}", e))?;
-    std::fs::write(&destino, &bytes).map_err(|e| format!("Erro ao salvar: {}", e))?;
+    // 1. POST para obter URL temporaria do PDF
+    let client = reqwest::Client::new();
+    let payload = serde_json::json!({
+        "type": "pdf",
+        "language": "pt",
+    });
+    let resp = client.post(&url).json(&payload).send().await
+        .map_err(|e| format!("Erro ao solicitar download: {}", e))?;
+    let body = resp.text().await.map_err(|e| format!("Erro ao ler resposta: {}", e))?;
+
+    // 2. Extrair URL do JSON (pode ser array ou objeto)
+    let json: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| format!("Resposta invalida: {} — body: {}", e, body))?;
+
+    let download_url = if let Some(arr) = json.as_array() {
+        arr.first()
+            .and_then(|o| o.get("url"))
+            .and_then(|u| u.as_str())
+            .map(|s| s.to_string())
+    } else {
+        json.get("url").and_then(|u| u.as_str()).map(|s| s.to_string())
+    }.ok_or_else(|| format!("URL de download nao retornada: {}", body))?;
+
+    // 3. Baixar o PDF da URL temporaria
+    let pdf_resp = client.get(&download_url).send().await
+        .map_err(|e| format!("Erro ao baixar PDF: {}", e))?;
+    let pdf_bytes = pdf_resp.bytes().await
+        .map_err(|e| format!("Erro ao ler bytes do PDF: {}", e))?;
+
+    // 4. Verificar se e base64 ou binario direto
+    let final_bytes = if pdf_bytes.starts_with(b"%PDF") {
+        // PDF binario direto
+        pdf_bytes.to_vec()
+    } else {
+        // Pode ser base64 — tentar decodificar
+        let text = String::from_utf8_lossy(&pdf_bytes);
+        match base64_decode(text.trim()) {
+            Some(decoded) if decoded.starts_with(b"%PDF") => decoded,
+            _ => pdf_bytes.to_vec(), // Usar como esta
+        }
+    };
+
+    // 5. Criar diretorio e salvar
+    if let Some(parent) = std::path::Path::new(&destino).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(&destino, &final_bytes)
+        .map_err(|e| format!("Erro ao salvar PDF: {}", e))?;
+
     Ok(destino)
+}
+
+fn base64_decode(input: &str) -> Option<Vec<u8>> {
+    // Decodificacao base64 simples sem dependencia externa
+    let table = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let input = input.trim().replace('\n', "").replace('\r', "");
+    let mut buf = Vec::with_capacity(input.len() * 3 / 4);
+    let mut acc = 0u32;
+    let mut bits = 0u32;
+    for c in input.bytes() {
+        if c == b'=' { break; }
+        let val = table.iter().position(|&b| b == c)? as u32;
+        acc = (acc << 6) | val;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            buf.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    Some(buf)
 }
