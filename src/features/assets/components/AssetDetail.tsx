@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText, PackageX, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge, TypeBadge, StorageBadge } from '@/components/ui/Badge';
@@ -9,13 +9,13 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRBAC } from '@/hooks/useRBAC';
-import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo } from '@/data/commands';
+import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo, criarDescarte } from '@/data/commands';
 import { AttachmentManager } from './AttachmentManager';
 import { AssetTimeline } from './AssetTimeline';
 import { QRCodeLabel } from './QRCodeLabel';
 import { formatDateTime, formatStorage } from '@/lib/utils';
 import { UserX } from 'lucide-react';
-import type { Asset, Movement, AssetAttachment, Desligamento, Termo } from '@/domain/models';
+import type { Asset, Movement, AssetAttachment, Desligamento, Termo, DescarteMotivo } from '@/domain/models';
 
 export const AssetDetail: React.FC = () => {
   const { detailAssetId, navigateTo, editAsset } = useAppStore();
@@ -31,6 +31,13 @@ export const AssetDetail: React.FC = () => {
   const [showQR, setShowQR] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creatingTermo, setCreatingTermo] = useState(false);
+  const [showDescarte, setShowDescarte] = useState(false);
+  const [descarteMotivo, setDescarteMotivo] = useState<DescarteMotivo>('OBSOLESCENCIA');
+  const [descarteDestino, setDescarteDestino] = useState('');
+  const [descarteResponsavel, setDescarteResponsavel] = useState('');
+  const [descarteData, setDescarteData] = useState('');
+  const [descarteObs, setDescarteObs] = useState('');
+  const [savingDescarte, setSavingDescarte] = useState(false);
 
   const loadData = async () => {
     if (!detailAssetId) return;
@@ -91,6 +98,47 @@ export const AssetDetail: React.FC = () => {
     }
   };
 
+  const MOTIVO_LABEL: Record<DescarteMotivo, string> = {
+    OBSOLESCENCIA: 'Obsolescência', DEFEITO_IRREPARAVEL: 'Defeito Irreparável',
+    FURTO: 'Furto', PERDA: 'Perda', DOACAO: 'Doação', VENDA: 'Venda', OUTRO: 'Outro',
+  };
+
+  const openDescarte = () => {
+    setDescarteMotivo('OBSOLESCENCIA');
+    setDescarteDestino('');
+    setDescarteResponsavel(useAuthStore.getState().user?.name ?? '');
+    setDescarteData('');
+    setDescarteObs('');
+    setShowDescarte(true);
+  };
+
+  const handleSalvarDescarte = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!asset || !descarteDestino.trim() || !descarteResponsavel.trim()) return;
+    setSavingDescarte(true);
+    try {
+      const userName = useAuthStore.getState().user?.name ?? 'sistema';
+      await criarDescarte(
+        {
+          asset_id: asset.id,
+          motivo: descarteMotivo,
+          destino: descarteDestino.trim(),
+          responsavel: descarteResponsavel.trim(),
+          data_prevista: descarteData || undefined,
+          observacoes: descarteObs.trim() || undefined,
+          registrado_por: userName,
+        },
+        userName,
+      );
+      toast('success', `Descarte agendado para ${asset.service_tag}.`);
+      setShowDescarte(false);
+    } catch (err) {
+      toast('error', `Erro ao agendar descarte: ${err}`);
+    } finally {
+      setSavingDescarte(false);
+    }
+  };
+
   const handleGerarTermo = async () => {
     if (!asset || !asset.employee_name) return;
     setCreatingTermo(true);
@@ -139,6 +187,16 @@ export const AssetDetail: React.FC = () => {
               disabled={creatingTermo}
             >
               {creatingTermo ? 'Gerando...' : 'Gerar Termo'}
+            </Button>
+          )}
+          {asset.status !== 'RETIRED' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<PackageX className="h-4 w-4" />}
+              onClick={openDescarte}
+            >
+              Descarte
             </Button>
           )}
           <Button
@@ -334,6 +392,107 @@ export const AssetDetail: React.FC = () => {
         model={asset.model}
         branchName={asset.branch_name}
       />
+
+      {/* Modal Agendar Descarte */}
+      {showDescarte && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowDescarte(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md animate-slide-up">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Agendar Descarte</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {asset.service_tag} · {asset.branch_name ?? '—'}
+                  </p>
+                </div>
+                <button type="button" title="Fechar" onClick={() => setShowDescarte(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <X className="h-4 w-4 text-slate-500" />
+                </button>
+              </div>
+              <form onSubmit={handleSalvarDescarte} className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">
+                    Motivo <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={descarteMotivo}
+                    onChange={(e) => setDescarteMotivo(e.target.value as DescarteMotivo)}
+                    title="Motivo do descarte"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-agro-500/40"
+                  >
+                    {(Object.keys(MOTIVO_LABEL) as DescarteMotivo[]).map((k) => (
+                      <option key={k} value={k}>{MOTIVO_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">
+                    Destino <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: ECO Eletrônicos SP, Doação à escola X…"
+                    value={descarteDestino}
+                    onChange={(e) => setDescarteDestino(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-agro-500/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">
+                    Responsável <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Nome do responsável pelo descarte"
+                    value={descarteResponsavel}
+                    onChange={(e) => setDescarteResponsavel(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-agro-500/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Data Prevista</label>
+                  <input
+                    type="date"
+                    title="Data prevista para o descarte"
+                    value={descarteData}
+                    onChange={(e) => setDescarteData(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-agro-500/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Observações</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Informações adicionais…"
+                    value={descarteObs}
+                    onChange={(e) => setDescarteObs(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-agro-500/40 resize-none"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowDescarte(false)}
+                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingDescarte || !descarteDestino.trim() || !descarteResponsavel.trim()}
+                    className="flex-1 px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors disabled:opacity-50"
+                  >
+                    {savingDescarte ? 'Agendando…' : 'Agendar Descarte'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
