@@ -176,6 +176,7 @@ pub fn run() {
             commands::listar_descartes,
             commands::concluir_descarte,
             commands::cancelar_descarte,
+            commands::reativar_ativo,
             // Desligamento de colaboradores
             commands::desligar_colaborador,
             commands::listar_desligamentos,

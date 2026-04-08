@@ -7,8 +7,8 @@ import {
   AlertTriangle,
   Laptop,
   Monitor,
-  ChevronRight,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import {
   listarCandidatosDescarte,
@@ -16,6 +16,7 @@ import {
   listarDescartes,
   concluirDescarte,
   cancelarDescarte,
+  reativarAtivo,
 } from '@/data/commands';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { EQUIPMENT_TYPE_LABEL } from '@/domain/constants';
@@ -517,7 +518,23 @@ export const DescartePage: React.FC = () => {
                           )}
                         </p>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0" />
+                      <button
+                        type="button"
+                        title="Reativar equipamento — volta para Estoque"
+                        onClick={async () => {
+                          try {
+                            await reativarAtivo(d.asset_id, getUserName());
+                            showToast(`${d.service_tag ?? d.asset_id} reativado e voltou para Estoque.`);
+                            await loadAll();
+                          } catch (err) {
+                            showToast(`Erro ao reativar: ${String(err)}`);
+                          }
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors shrink-0"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reativar
+                      </button>
                     </div>
                   ))}
                 </div>

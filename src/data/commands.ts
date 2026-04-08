@@ -312,6 +312,9 @@ export const concluirDescarte = (id: string, usuario: string): Promise<Descarte>
 export const cancelarDescarte = (id: string, usuario: string): Promise<Descarte> =>
   invoke('cancelar_descarte', { id, usuario });
 
+export const reativarAtivo = (id: string, usuario: string): Promise<Asset> =>
+  invoke('reativar_ativo', { id, usuario });
+
 // Desligamento de colaboradores
 export const desligarColaborador = (dados: CreateDesligamentoDto, usuario: string): Promise<Desligamento> =>
   invoke('desligar_colaborador', { dados, usuario });

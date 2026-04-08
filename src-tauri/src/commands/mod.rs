@@ -715,6 +715,12 @@ pub fn cancelar_descarte(state: State<'_, AppState>, id: String, usuario: String
     queries::cancelar_descarte(&mut conn, &id, &usuario).map_err(err)
 }
 
+#[tauri::command]
+pub fn reativar_ativo(state: State<'_, AppState>, id: String, usuario: String) -> Result<Asset, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::reativar_ativo(&mut conn, &id, &usuario).map_err(err)
+}
+
 // ============================================================
 // Desligamento de colaboradores
 // ============================================================

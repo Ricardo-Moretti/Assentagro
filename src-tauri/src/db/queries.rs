@@ -62,10 +62,18 @@ pub fn listar_filiais(conn: &mut PooledConn) -> Result<Vec<Branch>> {
 
 /// Lista ativos com filtros dinâmicos, busca e ordenação
 pub fn listar_ativos(conn: &mut PooledConn, filtros: &AssetFilters) -> Result<Vec<Asset>> {
-    let mut where_clauses: Vec<String> = vec![
-        ASSET_NOT_DELETED.to_string(),
-        "NOT EXISTS (SELECT 1 FROM descartes d2 WHERE d2.asset_id = a.id AND d2.status = 'PENDENTE')".to_string(),
-    ];
+    // Se filtrar explicitamente por RETIRED, mostra baixados sem restrição de descarte pendente.
+    // Caso contrário, oculta baixados e ativos com descarte pendente.
+    let showing_retired = filtros.status.as_deref() == Some("RETIRED");
+    let mut where_clauses: Vec<String> = if showing_retired {
+        vec![ASSET_NOT_DELETED.to_string()]
+    } else {
+        vec![
+            ASSET_NOT_DELETED.to_string(),
+            "a.status != 'RETIRED'".to_string(),
+            "NOT EXISTS (SELECT 1 FROM descartes d2 WHERE d2.asset_id = a.id AND d2.status = 'PENDENTE')".to_string(),
+        ]
+    };
     let mut param_values: Vec<mysql::Value> = Vec::new();
 
     // Busca textual (service_tag, employee_name, cpu, os)
@@ -2502,6 +2510,23 @@ pub fn cancelar_descarte(conn: &mut PooledConn, id: &str, usuario: &str) -> Resu
     )?.context("Descarte não encontrado após cancelamento")?;
 
     Ok(row_to_descarte(row))
+}
+
+pub fn reativar_ativo(conn: &mut PooledConn, id: &str, usuario: &str) -> Result<Asset> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    conn.exec_drop(
+        "UPDATE assets SET status = 'STOCK', employee_name = NULL, updated_at = ? WHERE id = ?",
+        (&now, id),
+    ).context("Falha ao reativar ativo")?;
+
+    registrar_auditoria(conn, id, &serde_json::json!({
+        "acao": "REATIVADO",
+        "status_anterior": "RETIRED",
+        "status_novo": "STOCK",
+    }), usuario)?;
+
+    obter_ativo(conn, id)
 }
 
 // ============================================================

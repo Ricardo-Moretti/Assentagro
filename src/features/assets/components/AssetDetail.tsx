@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText, PackageX, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText, PackageX, X, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge, TypeBadge, StorageBadge } from '@/components/ui/Badge';
@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRBAC } from '@/hooks/useRBAC';
-import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo, criarDescarte } from '@/data/commands';
+import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo, criarDescarte, reativarAtivo } from '@/data/commands';
 import { AttachmentManager } from './AttachmentManager';
 import { AssetTimeline } from './AssetTimeline';
 import { QRCodeLabel } from './QRCodeLabel';
@@ -31,6 +31,7 @@ export const AssetDetail: React.FC = () => {
   const [showQR, setShowQR] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creatingTermo, setCreatingTermo] = useState(false);
+  const [reativando, setReativando] = useState(false);
   const [showDescarte, setShowDescarte] = useState(false);
   const [descarteMotivo, setDescarteMotivo] = useState<DescarteMotivo>('OBSOLESCENCIA');
   const [descarteDestino, setDescarteDestino] = useState('');
@@ -139,6 +140,21 @@ export const AssetDetail: React.FC = () => {
     }
   };
 
+  const handleReativar = async () => {
+    if (!asset) return;
+    setReativando(true);
+    try {
+      const userName = useAuthStore.getState().user?.name ?? 'sistema';
+      await reativarAtivo(asset.id, userName);
+      toast('success', `${asset.service_tag} reativado e voltou para Estoque.`);
+      loadData();
+    } catch (err) {
+      toast('error', `Erro ao reativar: ${err}`);
+    } finally {
+      setReativando(false);
+    }
+  };
+
   const handleGerarTermo = async () => {
     if (!asset || !asset.employee_name) return;
     setCreatingTermo(true);
@@ -189,7 +205,17 @@ export const AssetDetail: React.FC = () => {
               {creatingTermo ? 'Gerando...' : 'Gerar Termo'}
             </Button>
           )}
-          {asset.status !== 'RETIRED' && (
+          {asset.status === 'RETIRED' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RotateCcw className="h-4 w-4" />}
+              onClick={handleReativar}
+              disabled={reativando}
+            >
+              {reativando ? 'Reativando...' : 'Reativar'}
+            </Button>
+          ) : (
             <Button
               variant="secondary"
               size="sm"
