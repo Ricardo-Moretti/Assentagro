@@ -2341,25 +2341,30 @@ const DESCARTE_SELECT: &str =
      JOIN assets a ON d.asset_id = a.id
      LEFT JOIN branches b ON a.branch_id = b.id";
 
-fn row_to_descarte(row: mysql::Row) -> Descarte {
+fn row_to_descarte(r: mysql::Row) -> Descarte {
+    // Índices seguem DESCARTE_SELECT:
+    // 0=d.id  1=d.asset_id  2=a.service_tag  3=a.model  4=b.name
+    // 5=a.equipment_type  6=a.year  7=d.motivo  8=d.destino  9=d.responsavel
+    // 10=d.data_prevista  11=d.data_conclusao  12=d.status  13=observacoes
+    // 14=d.registrado_por  15=d.created_at  16=d.updated_at
     Descarte {
-        id:             row.get("id").unwrap_or_default(),
-        asset_id:       row.get("asset_id").unwrap_or_default(),
-        service_tag:    row.get("service_tag"),
-        asset_model:    row.get("asset_model"),
-        branch_name:    row.get("branch_name"),
-        equipment_type: row.get("equipment_type"),
-        year:           row.get("year"),
-        motivo:         row.get("motivo").unwrap_or_default(),
-        destino:        row.get("destino").unwrap_or_default(),
-        responsavel:    row.get("responsavel").unwrap_or_default(),
-        data_prevista:  row.get("data_prevista"),
-        data_conclusao: row.get("data_conclusao"),
-        status:         row.get("status").unwrap_or_default(),
-        observacoes:    row.get("observacoes").unwrap_or_default(),
-        registrado_por: row.get("registrado_por"),
-        created_at:     row.get("created_at").unwrap_or_default(),
-        updated_at:     row.get("updated_at").unwrap_or_default(),
+        id:             safe_str(&r, 0),
+        asset_id:       safe_str(&r, 1),
+        service_tag:    safe_opt(&r, 2),
+        asset_model:    safe_opt(&r, 3),
+        branch_name:    safe_opt(&r, 4),
+        equipment_type: safe_opt(&r, 5),
+        year:           safe_i64(&r, 6),
+        motivo:         safe_str(&r, 7),
+        destino:        safe_str(&r, 8),
+        responsavel:    safe_str(&r, 9),
+        data_prevista:  safe_opt(&r, 10),
+        data_conclusao: safe_opt(&r, 11),
+        status:         safe_str(&r, 12),
+        observacoes:    safe_str(&r, 13),
+        registrado_por: safe_opt(&r, 14),
+        created_at:     safe_str(&r, 15),
+        updated_at:     safe_str(&r, 16),
     }
 }
 
@@ -3010,6 +3015,9 @@ fn safe_str(r: &mysql::Row, idx: usize) -> String {
 }
 fn safe_opt(r: &mysql::Row, idx: usize) -> Option<String> {
     r.get::<Option<String>, _>(idx).flatten()
+}
+fn safe_i64(r: &mysql::Row, idx: usize) -> Option<i64> {
+    r.get::<Option<i64>, _>(idx).flatten()
 }
 
 fn row_to_termo(r: mysql::Row) -> Termo {
