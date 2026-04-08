@@ -62,7 +62,10 @@ pub fn listar_filiais(conn: &mut PooledConn) -> Result<Vec<Branch>> {
 
 /// Lista ativos com filtros dinâmicos, busca e ordenação
 pub fn listar_ativos(conn: &mut PooledConn, filtros: &AssetFilters) -> Result<Vec<Asset>> {
-    let mut where_clauses: Vec<String> = vec![ASSET_NOT_DELETED.to_string()];
+    let mut where_clauses: Vec<String> = vec![
+        ASSET_NOT_DELETED.to_string(),
+        "NOT EXISTS (SELECT 1 FROM descartes d2 WHERE d2.asset_id = a.id AND d2.status = 'PENDENTE')".to_string(),
+    ];
     let mut param_values: Vec<mysql::Value> = Vec::new();
 
     // Busca textual (service_tag, employee_name, cpu, os)

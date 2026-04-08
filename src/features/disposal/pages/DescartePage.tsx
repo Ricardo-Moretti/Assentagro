@@ -116,7 +116,7 @@ const AgendarModal: React.FC<ModalProps> = ({ asset, onClose, onSave }) => {
                 {asset.service_tag} · {asset.branch_name ?? '—'} · {asset.year ?? '—'}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+            <button type="button" title="Fechar" onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
               <X className="h-4 w-4 text-slate-500" />
             </button>
           </div>
@@ -174,6 +174,7 @@ const AgendarModal: React.FC<ModalProps> = ({ asset, onClose, onSave }) => {
               </label>
               <input
                 type="date"
+                title="Data prevista para o descarte"
                 value={dataPrevista}
                 onChange={(e) => setDataPrevista(e.target.value)}
                 className={inputClass}
@@ -242,20 +243,15 @@ export const DescartePage: React.FC = () => {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    try {
-      const [c, a, h] = await Promise.all([
-        listarCandidatosDescarte(),
-        listarDescartes('PENDENTE'),
-        listarDescartes('CONCLUIDO'),
-      ]);
-      setCandidatos(c);
-      setAgendados(a);
-      setHistorico(h);
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
+    const [c, a, h] = await Promise.allSettled([
+      listarCandidatosDescarte(),
+      listarDescartes('PENDENTE'),
+      listarDescartes('CONCLUIDO'),
+    ]);
+    if (c.status === 'fulfilled') setCandidatos(c.value);
+    if (a.status === 'fulfilled') setAgendados(a.value);
+    if (h.status === 'fulfilled') setHistorico(h.value);
+    setLoading(false);
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
