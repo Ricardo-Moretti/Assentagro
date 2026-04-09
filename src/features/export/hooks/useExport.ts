@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { save } from '@tauri-apps/plugin-dialog';
-import { listarAtivosParaExportacao, escreverArquivo } from '@/data/commands';
+import { listarAtivosParaExportacao, escreverArquivoUsuario } from '@/data/commands';
 import { STATUS_LABEL, EQUIPMENT_TYPE_LABEL, STORAGE_TYPE_LABEL } from '@/domain/constants';
 import { formatStorage } from '@/lib/utils';
 import type { Asset, AssetStatus, EquipmentType, StorageType } from '@/domain/models';
@@ -121,7 +121,7 @@ export function useExport() {
 
       if (savePath) {
         const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-        await escreverArquivo(savePath, Array.from(new Uint8Array(buffer)));
+        await escreverArquivoUsuario(savePath, Array.from(new Uint8Array(buffer)));
         setProgress('Exportação concluída!');
       } else {
         setProgress('Exportação cancelada.');

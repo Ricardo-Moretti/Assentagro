@@ -251,6 +251,10 @@ export const desativarUsuario = (id: string, role: string): Promise<void> =>
 export const escreverArquivo = (caminho: string, dados: number[]): Promise<void> =>
   invoke('escrever_arquivo', { caminho, dados });
 
+// Para paths escolhidos pelo usuário via diálogo nativo (exportações)
+export const escreverArquivoUsuario = (caminho: string, dados: number[]): Promise<void> =>
+  invoke('escrever_arquivo_usuario', { caminho, dados });
+
 // Verificação de conexão
 export const verificarConexao = (): Promise<boolean> =>
   invoke('verificar_conexao');

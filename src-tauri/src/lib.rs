@@ -158,6 +158,7 @@ pub fn run() {
             commands::desativar_usuario,
             // Utilitário
             commands::escrever_arquivo,
+            commands::escrever_arquivo_usuario,
             // Verificação de conexão
             commands::verificar_conexao,
             // Empréstimos / Retiradas

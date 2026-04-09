@@ -574,13 +574,25 @@ pub fn desativar_usuario(state: State<'_, AppState>, id: String, role: String) -
 
 #[tauri::command]
 pub fn escrever_arquivo(state: State<'_, AppState>, caminho: String, dados: Vec<u8>) -> Result<(), String> {
-    // Validar que o path esta dentro do diretorio do app
+    // Validar que o path esta dentro do diretorio do app (uso interno: termos, etc.)
     let safe_path = validar_path_seguro(&caminho, &state.app_dir)?;
     if let Some(parent) = safe_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Falha ao criar diretório: {}", e))?;
     }
     std::fs::write(&safe_path, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
+}
+
+#[tauri::command]
+pub fn escrever_arquivo_usuario(caminho: String, dados: Vec<u8>) -> Result<(), String> {
+    // Para paths escolhidos pelo usuário via diálogo nativo (save dialog).
+    // Não restringe ao diretório do app — o diálogo já é a barreira de segurança.
+    let path = std::path::Path::new(&caminho);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Falha ao criar diretório: {}", e))?;
+    }
+    std::fs::write(path, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
 }
 
 // ============================================================
