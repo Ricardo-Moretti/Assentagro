@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AssetAgro — Roadmap ITAM 2026</title>
+<style>
+  :root {
+    --green:  #22c55e;
+    --green2: #16a34a;
+    --dark:   #0f172a;
+    --dark2:  #1e293b;
+    --dark3:  #334155;
+    --slate:  #475569;
+    --light:  #f1f5f9;
+    --white:  #ffffff;
+    --amber:  #f59e0b;
+    --red:    #ef4444;
+    --blue:   #3b82f6;
+    --purple: #a855f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0a0f1e;
+    color: var(--white);
+    overflow: hidden;
+  }
+
+  /* ── Slides ── */
+  .deck { width: 100vw; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 48px 64px;
+    opacity: 0;
+    transition: opacity .4s ease;
+  }
+  .slide.active {
+    display: flex;
+    opacity: 1;
+  }
+
+  /* ── Nav ── */
+  .nav {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 12px; align-items: center; z-index: 100;
+    background: rgba(15,23,42,.8); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 40px; padding: 10px 20px;
+  }
+  .nav button {
+    background: none; border: none; color: var(--white);
+    cursor: pointer; font-size: 18px; padding: 4px 8px;
+    border-radius: 6px; transition: background .2s;
+  }
+  .nav button:hover { background: rgba(255,255,255,.12); }
+  .nav .counter { font-size: 13px; color: #94a3b8; min-width: 48px; text-align: center; }
+
+  /* ── Slide 1 — Cover ── */
+  .s-cover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  }
+  .s-cover::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(34,197,94,.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover-badge {
+    background: rgba(34,197,94,.15);
+    border: 1px solid rgba(34,197,94,.4);
+    color: var(--green);
+    font-size: 11px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 16px; border-radius: 20px;
+    margin-bottom: 24px;
+  }
+  .cover-title {
+    font-size: clamp(42px, 6vw, 72px);
+    font-weight: 800; line-height: 1.1;
+    text-align: center;
+    background: linear-gradient(135deg, #fff 30%, var(--green) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+  .cover-sub {
+    font-size: 18px; color: #94a3b8; text-align: center;
+    max-width: 560px; line-height: 1.6;
+    margin-bottom: 48px;
+  }
+  .cover-pills {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  }
+  .pill {
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 24px; padding: 8px 20px;
+    font-size: 13px; color: #cbd5e1;
+  }
+  .pill.green { border-color: rgba(34,197,94,.4); color: var(--green); }
+
+  /* ── Section header ── */
+  .sec-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--green);
+    margin-bottom: 8px;
+  }
+  .sec-title {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800; line-height: 1.15;
+    margin-bottom: 8px;
+  }
+  .sec-sub {
+    font-size: 15px; color: #94a3b8; margin-bottom: 36px;
+  }
+
+  /* ── Slide 2 — Hoje ── */
+  .s-hoje {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+  }
+  .hoje-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    width: 100%; max-width: 960px;
+  }
+  .hoje-card {
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px; padding: 20px;
+  }
+  .hoje-card .icon {
+    font-size: 22px; margin-bottom: 10px;
+  }
+  .hoje-card .label {
+    font-size: 13px; font-weight: 600; color: var(--white); margin-bottom: 6px;
+  }
+  .hoje-card .desc {
+    font-size: 12px; color: #64748b; line-height: 1.5;
+  }
+  .dot-ok   { color: var(--green); }
+  .dot-med  { color: var(--amber); }
+  .dot-no   { color: var(--red);   }
+
+  /* ── Slide 3 — Gap ── */
+  .s-gap {
+    background: linear-gradient(160deg, #0f172a 0%, #1c1040 100%);
+  }
+  .gap-table {
+    width: 100%; max-width: 880px;
+    border-collapse: collapse;
+  }
+  .gap-table th {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: #64748b;
+    padding: 8px 14px; text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .gap-table td {
+    padding: 11px 14px; font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .gap-table tr:last-child td { border-bottom: none; }
+  .tag {
+    display: inline-block; padding: 3px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .tag.ok     { background: rgba(34,197,94,.15); color: var(--green); }
+  .tag.med    { background: rgba(245,158,11,.15); color: var(--amber); }
+  .tag.weak   { background: rgba(239,68,68,.15);  color: #fca5a5; }
+  .tag.absent { background: rgba(100,116,139,.2);  color: #94a3b8; }
+  .priority-h { color: var(--red);   font-weight: 700; font-size: 12px; }
+  .priority-m { color: var(--amber); font-weight: 600; font-size: 12px; }
+  .priority-l { color: var(--green); font-weight: 600; font-size: 12px; }
+
+  /* ── Phase slides ── */
+  .s-phase {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    align-items: flex-start;
+  }
+  .phase-header {
+    width: 100%; max-width: 960px; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .phase-num {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 800; flex-shrink: 0;
+  }
+  .p1 .phase-num { background: linear-gradient(135deg, #22c55e, #16a34a); }
+  .p2 .phase-num { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+  .p3 .phase-num { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+
+  .phase-meta { flex: 1; }
+  .phase-name { font-size: 24px; font-weight: 800; }
+  .phase-period { font-size: 13px; color: #64748b; margin-top: 2px; }
+  .phase-focus {
+    font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 20px;
+  }
+  .p1 .phase-focus { background: rgba(34,197,94,.12); color: var(--green); }
+  .p2 .phase-focus { background: rgba(59,130,246,.12); color: var(--blue); }
+  .p3 .phase-focus { background: rgba(168,85,247,.12); color: var(--purple); }
+
+  .phase-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    width: 100%; max-width: 960px;
+  }
+  .phase-item {
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+    border-radius: 12px; padding: 14px 16px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .phase-item .ico { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .phase-item .txt { font-size: 12.5px; color: #cbd5e1; line-height: 1.5; }
+  .phase-item .txt strong { color: #fff; display: block; font-size: 13px; margin-bottom: 2px; }
+
+  /* ── Slide 7 — Vision ── */
+  .s-vision {
+    background: linear-gradient(135deg, #0f172a 0%, #0d1f13 50%, #0f172a 100%);
+  }
+  .vision-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    width: 100%; max-width: 960px; margin-top: 8px;
+  }
+  .vision-card {
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px; padding: 22px 18px; text-align: center;
+  }
+  .vision-card .big { font-size: 32px; margin-bottom: 8px; }
+  .vision-card .vl { font-size: 20px; font-weight: 800; color: var(--green); }
+  .vision-card .vd { font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.4; }
+
+  .quote {
+    max-width: 700px; text-align: center;
+    font-size: 16px; color: #94a3b8; line-height: 1.7;
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding-top: 28px; margin-top: 28px;
+  }
+  .quote strong { color: var(--white); }
+</style>
+</head>
+<body>
+
+<div class="deck">
+
+  <!-- ════════════════════════════ SLIDE 1 — COVER ════════════════════════════ -->
+  <div class="slide s-cover active" data-slide="1">
+    <div class="cover-badge">Tracbel Agro · TI</div>
+    <h1 class="cover-title">AssetAgro<br>Roadmap ITAM 2026</h1>
+    <p class="cover-sub">
+      De gestão de ativos básica a uma operação ITAM madura —
+      análise de gaps, prioridades e próximos passos.
+    </p>
+    <div class="cover-pills">
+      <span class="pill">16 Filiais</span>
+      <span class="pill">Tauri 2 + MySQL 8</span>
+      <span class="pill green">Fase 1 · Q2 2026</span>
+      <span class="pill">ISO 19770 Referência</span>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════ SLIDE 2 — HOJE ════════════════════════════ -->
+  <div class="slide s-hoje" data-slide="2">
+    <div class="sec-badge">Estado Atual</div>
+    <h2 class="sec-title">O que o AssetAgro faz hoje</h2>
+    <p class="sec-sub">Funcionalidades já implementadas e em produção</p>
+
+    <div class="hoje-grid">
+      <div class="hoje-card">
+        <div class="icon">💻</div>
+        <div class="label"><span class="dot-ok">●</span> Inventário Manual</div>
+        <div class="desc">Cadastro completo de equipamentos: modelo, CPU, RAM, storage, SO, filial, colaborador.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🔄</div>
+        <div class="label"><span class="dot-ok">●</span> Ciclo de Vida Básico</div>
+        <div class="desc">Status STOCK → EM USO → MANUTENÇÃO → RETIRED. Descarte com motivo e destino.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🏢</div>
+        <div class="label"><span class="dot-ok">●</span> Multi-filial</div>
+        <div class="desc">16 filiais Tracbel Agro. Filtros por filial, exportação Excel por aba.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🔐</div>
+        <div class="label"><span class="dot-ok">●</span> RBAC 2 Níveis</div>
+        <div class="desc">Perfis admin e user. Auditoria de alterações com timestamp e usuário responsável.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🔔</div>
+        <div class="label"><span class="dot-med">●</span> Alertas Básicos</div>
+        <div class="desc">Notificações in-app. Sem integração e-mail/Teams. Sem alertas de expiração de garantia.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">📊</div>
+        <div class="label"><span class="dot-med">●</span> Relatórios Simples</div>
+        <div class="desc">Exportação Excel. Dashboard com contadores. Sem gráficos de tendência ou TCO.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🖨️</div>
+        <div class="label"><span class="dot-med">●</span> Periféricos Parcial</div>
+        <div class="desc">Impressoras e scanners cadastráveis. Sem controle de consumíveis ou tonner.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🤝</div>
+        <div class="label"><span class="dot-no">●</span> D4Sign (Pendente)</div>
+        <div class="desc">Integração com assinatura digital planejada. Termos de responsabilidade não finalizados.</div>
+      </div>
+      <div class="hoje-card">
+        <div class="icon">🔍</div>
+        <div class="label"><span class="dot-no">●</span> Descoberta Automática</div>
+        <div class="desc">Collector WMI iniciado mas não em produção. Sem inventário automático de rede.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════ SLIDE 3 — GAPS ════════════════════════════ -->
+  <div class="slide s-gap" data-slide="3">
+    <div class="sec-badge">Análise de Gaps · ISO 19770</div>
+    <h2 class="sec-title">7 Práticas ITAM — Onde estamos</h2>
+    <p class="sec-sub">Referência: SoftwareOne / ISO 19770 · Avaliação abril 2026</p>
+
+    <table class="gap-table">
+      <thead>
+        <tr>
+          <th>Prática ITAM</th>
+          <th>Maturidade Atual</th>
+          <th>Principal Gap</th>
+          <th>Prioridade</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>🔍 Discovery & Inventory</td>
+          <td><span class="tag med">Parcial</span></td>
+          <td style="color:#94a3b8;font-size:12px">Collector WMI não ativo em produção</td>
+          <td><span class="priority-h">Alta</span></td>
+        </tr>
+        <tr>
+          <td>🔄 Lifecycle Management</td>
+          <td><span class="tag med">Médio</span></td>
+          <td style="color:#94a3b8;font-size:12px">Sem alerta de garantia, sem depreciação</td>
+          <td><span class="priority-m">Média</span></td>
+        </tr>
+        <tr>
+          <td>💰 Financial / TCO</td>
+          <td><span class="tag weak">Fraco</span></td>
+          <td style="color:#94a3b8;font-size:12px">Sem custo de aquisição, sem depreciação contábil</td>
+          <td><span class="priority-m">Média</span></td>
+        </tr>
+        <tr>
+          <td>📦 SAM (Software Asset Mgmt)</td>
+          <td><span class="tag absent">Ausente</span></td>
+          <td style="color:#94a3b8;font-size:12px">Sem catálogo de software, sem controle de licenças</td>
+          <td><span class="priority-h">Alta</span></td>
+        </tr>
+        <tr>
+          <td>✅ Compliance & Audit</td>
+          <td><span class="tag med">Parcial</span></td>
+          <td style="color:#94a3b8;font-size:12px">Auditoria existe, sem relatório de conformidade</td>
+          <td><span class="priority-m">Média</span></td>
+        </tr>
+        <tr>
+          <td>🎫 ITSM / CMDB Integration</td>
+          <td><span class="tag absent">Ausente</span></td>
+          <td style="color:#94a3b8;font-size:12px">Sem chamados, sem relação CI↔Serviço</td>
+          <td><span class="priority-l">Baixa</span></td>
+        </tr>
+        <tr>
+          <td>🛡️ Security & Risk</td>
+          <td><span class="tag weak">Mínimo</span></td>
+          <td style="color:#94a3b8;font-size:12px">Sem alertas EOL, sem integração SIEM</td>
+          <td><span class="priority-h">Alta</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ════════════════════════════ SLIDE 4 — FASE 1 ════════════════════════════ -->
+  <div class="slide s-phase p1" data-slide="4">
+    <div class="phase-header">
+      <div class="phase-num">1</div>
+      <div class="phase-meta">
+        <div class="phase-name">Fase 1 — Estabilização & Dados</div>
+        <div class="phase-period">Meses 1–3 · Abril – Junho 2026</div>
+      </div>
+      <div class="phase-focus">Fundação Sólida</div>
+    </div>
+
+    <div class="phase-grid">
+      <div class="phase-item">
+        <span class="ico">🖥️</span>
+        <div class="txt"><strong>Collector WMI em Produção</strong>Inventário automático das máquinas via rede local em todas as filiais.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">💰</span>
+        <div class="txt"><strong>Custo de Aquisição</strong>Campo de valor de compra, data de aquisição e fornecedor em cada ativo.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📅</span>
+        <div class="txt"><strong>Controle de Garantia</strong>Data de fim de garantia + alertas automáticos 60/30 dias antes do vencimento.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">✍️</span>
+        <div class="txt"><strong>D4Sign — Termos</strong>Termo de responsabilidade digital gerado e assinado ao vincular ativo ao colaborador.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">👥</span>
+        <div class="txt"><strong>RBAC Expandido</strong>3 níveis: TI Central / TI Filial / Apenas Leitura. Acesso segregado por filial.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🤝</span>
+        <div class="txt"><strong>Integração RH</strong>Comparador RH × AssetAgro automatizado. Alerta de colaboradores sem equipamento.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📊</span>
+        <div class="txt"><strong>Dashboard Filial</strong>Indicadores por filial: total ativos, em uso, em manutenção, aguardando descarte.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🏷️</span>
+        <div class="txt"><strong>QR Code / Etiqueta</strong>Etiqueta impressa com QR Code único por ativo para scan físico rápido.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📦</span>
+        <div class="txt"><strong>Catálogo de Software</strong>Início do módulo SAM: listar softwares instalados vindos do Collector.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════ SLIDE 5 — FASE 2 ════════════════════════════ -->
+  <div class="slide s-phase p2" data-slide="5">
+    <div class="phase-header">
+      <div class="phase-num">2</div>
+      <div class="phase-meta">
+        <div class="phase-name">Fase 2 — Inteligência & Conformidade</div>
+        <div class="phase-period">Meses 3–6 · Julho – Setembro 2026</div>
+      </div>
+      <div class="phase-focus" style="background:rgba(59,130,246,.12);color:#60a5fa">Visibilidade Total</div>
+    </div>
+
+    <div class="phase-grid">
+      <div class="phase-item">
+        <span class="ico">📉</span>
+        <div class="txt"><strong>Depreciação Contábil</strong>Cálculo automático de depreciação linear/acelerada. Relatório de TCO por filial.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🔑</span>
+        <div class="txt"><strong>Controle de Licenças</strong>Quantidade comprada vs instalada. Alertas de sobrelicença e sublicença.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">⚠️</span>
+        <div class="txt"><strong>Alertas de EOL / EOS</strong>End-of-Life de hardware e software. Priorização de substituição automática.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📋</span>
+        <div class="txt"><strong>Relatório de Conformidade</strong>Score ITAM por filial. Exportação para auditoria interna e compliance fiscal.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🔔</span>
+        <div class="txt"><strong>Notificações Teams/E-mail</strong>Alertas críticos enviados ao responsável da filial via Teams ou e-mail corporativo.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📱</span>
+        <div class="txt"><strong>App Mobile (Leitura)</strong>Versão mobile para consulta de ativo via QR Code sem precisar do desktop.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🗺️</span>
+        <div class="txt"><strong>Mapa de Ativos</strong>Visualização geográfica das filiais com totais e alertas em cada localização.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📂</span>
+        <div class="txt"><strong>Anexos & Notas Fiscais</strong>Upload de NF, contrato de manutenção e manual vinculados ao ativo.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🔄</span>
+        <div class="txt"><strong>Workflow de Aprovação</strong>Solicitação de descarte / transferência com aprovação pelo gestor da filial.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════ SLIDE 6 — FASE 3 ════════════════════════════ -->
+  <div class="slide s-phase p3" data-slide="6">
+    <div class="phase-header">
+      <div class="phase-num">3</div>
+      <div class="phase-meta">
+        <div class="phase-name">Fase 3 — Maturidade & Integração</div>
+        <div class="phase-period">Meses 6–12 · Outubro 2026 – Março 2027</div>
+      </div>
+      <div class="phase-focus" style="background:rgba(168,85,247,.12);color:#c084fc">Operação Preditiva</div>
+    </div>
+
+    <div class="phase-grid">
+      <div class="phase-item">
+        <span class="ico">🎫</span>
+        <div class="txt"><strong>Módulo de Chamados</strong>Abertura de tickets de manutenção diretamente no ativo. SLA e histórico integrado.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🧠</span>
+        <div class="txt"><strong>Score de Risco de Ativo</strong>Algoritmo que combina idade, garantia, incidentes e EOL para priorizar substituição.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🔗</span>
+        <div class="txt"><strong>CMDB Básico</strong>Relação Ativo → Serviço → Usuário. Impacto de falha calculado por dependência.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🛒</span>
+        <div class="txt"><strong>Gestão de Compras</strong>Solicitação de novo equipamento com justificativa, orçamento e aprovação diretoria.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🤖</span>
+        <div class="txt"><strong>Onboarding Automático</strong>Ao admitir colaborador no RH, disparar fluxo de alocação de equipamento no AssetAgro.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📡</span>
+        <div class="txt"><strong>API Aberta (REST)</strong>Endpoints documentados para integração com ERP, RH e sistemas de terceiros.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">🛡️</span>
+        <div class="txt"><strong>Integração Segurança</strong>Exportação para SIEM. Alertas de ativo não gerenciado detectado na rede.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">📈</span>
+        <div class="txt"><strong>BI & Previsão</strong>Dashboards de tendência. Previsão de renovação de hardware dos próximos 12 meses.</div>
+      </div>
+      <div class="phase-item">
+        <span class="ico">☁️</span>
+        <div class="txt"><strong>Cloud Assets</strong>Rastreio de instâncias cloud (Azure/AWS) junto com ativos físicos no mesmo painel.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════ SLIDE 7 — VISÃO FINAL ════════════════════════════ -->
+  <div class="slide s-vision" data-slide="7">
+    <div class="sec-badge">Visão 12 Meses</div>
+    <h2 class="sec-title">AssetAgro como plataforma ITAM completa</h2>
+    <p class="sec-sub">Métricas esperadas ao final do roadmap · Março 2027</p>
+
+    <div class="vision-grid">
+      <div class="vision-card">
+        <div class="big">🖥️</div>
+        <div class="vl">100%</div>
+        <div class="vd">Inventário automatizado via Collector WMI</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">⏱️</div>
+        <div class="vl">&lt; 5 min</div>
+        <div class="vd">Tempo para vincular novo ativo a colaborador com termo digital</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">💰</div>
+        <div class="vl">TCO</div>
+        <div class="vd">Custo total por ativo, filial e tipo de equipamento em tempo real</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">🔔</div>
+        <div class="vl">0 surpresas</div>
+        <div class="vd">Garantias, licenças e EOL sempre monitorados com alertas antecipados</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">📦</div>
+        <div class="vl">SAM</div>
+        <div class="vd">Controle de licenças de software sem sobrecusto ou risco de auditoria</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">🤝</div>
+        <div class="vl">RH Sync</div>
+        <div class="vd">Colaboradores e equipamentos sempre sincronizados automaticamente</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">🛡️</div>
+        <div class="vl">ISO 19770</div>
+        <div class="vd">Nível 2 de maturidade ITAM atingido — pronto para auditoria externa</div>
+      </div>
+      <div class="vision-card">
+        <div class="big">🔗</div>
+        <div class="vl">API</div>
+        <div class="vd">Integração com ERP, RH e segurança via API REST documentada</div>
+      </div>
+    </div>
+
+    <div class="quote">
+      De uma ferramenta de controle manual a uma plataforma ITAM que
+      <strong>reduz custos, previne riscos e automatiza o ciclo de vida</strong>
+      dos ativos de TI da Tracbel Agro.
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Navigation ── -->
+<div class="nav">
+  <button id="prev" onclick="go(-1)">←</button>
+  <span class="counter" id="ctr">1 / 7</span>
+  <button id="next" onclick="go(1)">→</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total  = slides.length;
+  let cur = 0;
+
+  function show(n) {
+    slides[cur].classList.remove('active');
+    cur = (n + total) % total;
+    slides[cur].classList.add('active');
+    document.getElementById('ctr').textContent = `${cur + 1} / ${total}`;
+  }
+
+  function go(dir) { show(cur + dir); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') go(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    go(-1);
+  });
+</script>
+</body>
+</html>

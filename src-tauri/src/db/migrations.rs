@@ -403,6 +403,50 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
         info!("Migracao 016 concluida.");
     }
 
+    // Migration 017 — OCS Inventory: campos de sync + tabelas live_data e software
+    if versao_atual < 17 {
+        info!("Executando migracao 017: OCS Inventory integration...");
+
+        // Ignora erro 1060 (duplicate column) — MySQL nao suporta ADD COLUMN IF NOT EXISTS
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN ocs_id INT NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN hostname VARCHAR(100) NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN ip_address VARCHAR(45) NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN last_logged_user VARCHAR(255) NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN ocs_last_seen VARCHAR(30) NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN ocs_synced_at VARCHAR(30) NULL");
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS asset_live_data (
+                asset_id        VARCHAR(36) NOT NULL PRIMARY KEY,
+                ram_total_mb    INT         NULL,
+                ram_free_mb     INT         NULL,
+                disk_c_total_mb BIGINT      NULL,
+                disk_c_free_mb  BIGINT      NULL,
+                updated_at      VARCHAR(30) NOT NULL,
+                CONSTRAINT fk_live_asset FOREIGN KEY (asset_id)
+                    REFERENCES assets(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS asset_software (
+                id           VARCHAR(36)  NOT NULL PRIMARY KEY,
+                asset_id     VARCHAR(36)  NOT NULL,
+                name         VARCHAR(255) NOT NULL,
+                version      VARCHAR(100) NULL,
+                publisher    VARCHAR(255) NULL,
+                install_date VARCHAR(30)  NULL,
+                KEY idx_sw_asset (asset_id),
+                KEY idx_sw_name  (name),
+                CONSTRAINT fk_sw_asset FOREIGN KEY (asset_id)
+                    REFERENCES assets(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB"
+        )?;
+
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (17)")?;
+        info!("Migracao 017 concluida.");
+    }
+
     // Seed default admin user
     seed_admin_user(conn)?;
 

@@ -1,0 +1,22 @@
+{
+  "ocs": {
+    "host": "172.16.17.1",
+    "port": 3306,
+    "database": "ocsweb",
+    "user": "ocs",
+    "password": "PREENCHER_SENHA_OCS"
+  },
+  "assetagro": {
+    "host": "192.168.90.5",
+    "port": 3306,
+    "database": "assetagro",
+    "user": "assetagro",
+    "password": "PREENCHER_SENHA_ASSETAGRO"
+  },
+  "sync": {
+    "stale_days": 90,
+    "create_new_assets": true,
+    "sync_software": true,
+    "log_level": "INFO"
+  }
+}
