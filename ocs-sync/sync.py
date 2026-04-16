@@ -392,7 +392,7 @@ class OcsSyncer:
 
     def run(self) -> None:
         t0 = time.monotonic()
-        stale_cutoff = datetime.utcnow() - timedelta(days=self.stale_days)
+        stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=self.stale_days)
 
         ocs_conn = self._connect_ocs()
         ag_conn = self._connect_assetagro()
