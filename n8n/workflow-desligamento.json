@@ -1,0 +1,295 @@
+{
+  "name": "AssetAgro — Desligamento Automático",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "id": "node-schedule",
+      "name": "A cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS glpi_desligamentos (glpi_ticket_id INT PRIMARY KEY, colaborador_nome VARCHAR(255) NOT NULL, tipo VARCHAR(50) NOT NULL DEFAULT 'Demissao', ativos_atualizados INT NOT NULL DEFAULT 0, processado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "options": {}
+      },
+      "id": "node-create-table",
+      "name": "Criar Tabela Tracking",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [420, 400],
+      "credentials": {
+        "mySql": {
+          "id": "CREDENTIAL_ASSETAGRO_MYSQL",
+          "name": "AssetAgro MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT glpi_ticket_id FROM glpi_desligamentos",
+        "options": {
+          "alwaysOutputData": true
+        }
+      },
+      "id": "node-get-processed",
+      "name": "IDs Processados",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [640, 400],
+      "credentials": {
+        "mySql": {
+          "id": "CREDENTIAL_ASSETAGRO_MYSQL",
+          "name": "AssetAgro MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, service_tag, equipment_type, model, employee_name FROM assets WHERE status = 'IN_USE' AND deleted_at IS NULL AND employee_name IS NOT NULL AND employee_name != ''",
+        "options": {
+          "alwaysOutputData": true
+        }
+      },
+      "id": "node-get-assets",
+      "name": "Ativos IN_USE",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [860, 400],
+      "credentials": {
+        "mySql": {
+          "id": "CREDENTIAL_ASSETAGRO_MYSQL",
+          "name": "AssetAgro MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.90.5:3003/api/glpi/proxy",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-webhook-key", "value": "445f35592e9fe8fc39fb41a47a3435b34eec21b09ac44d049c4f3f0ecb1fbe5d" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "{ \"path\": \"/initSession\", \"method\": \"GET\" }",
+        "options": {}
+      },
+      "id": "node-glpi-init",
+      "name": "GLPI initSession",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.90.5:3003/api/glpi/proxy",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-webhook-key", "value": "445f35592e9fe8fc39fb41a47a3435b34eec21b09ac44d049c4f3f0ecb1fbe5d" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{ JSON.stringify({ path: '/search/Ticket?criteria[0][field]=7&criteria[0][searchtype]=equals&criteria[0][value]=442&criteria[1][link]=AND&criteria[1][field]=12&criteria[1][searchtype]=equals&criteria[1][value]=notold&forcedisplay[0]=1&forcedisplay[1]=2&forcedisplay[2]=21&range=0-100&sort=1&order=DESC', method: 'GET', headers: { 'Session-Token': $('GLPI initSession').first().json.session_token } }) }}",
+        "options": {}
+      },
+      "id": "node-glpi-search",
+      "name": "Buscar Chamados GLPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 400]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var processedIds = new Set(\n  $('IDs Processados').all()\n    .map(function(i) { return Number(i.json.glpi_ticket_id); })\n    .filter(function(n) { return !isNaN(n) && n > 0; })\n);\n\nvar todosAtivos = $('Ativos IN_USE').all().map(function(i) { return i.json; });\nvar sessionToken = $('GLPI initSession').first().json.session_token;\n\nvar searchResult = $input.first().json;\nvar items = Array.isArray(searchResult.data)\n  ? searchResult.data\n  : Object.values(searchResult.data || {});\n\nvar PARTICULAS = new Set(['de','da','do','dos','das','e','em','a','o','um','uma']);\n\nfunction tokenizar(nome) {\n  return (nome || '')\n    .toLowerCase()\n    .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z\\s]/g, '')\n    .trim()\n    .split(/\\s+/)\n    .filter(function(w) { return w.length > 1 && !PARTICULAS.has(w); });\n}\n\nfunction scoreSimilaridade(a, b) {\n  var ta = tokenizar(a), tb = tokenizar(b);\n  if (!ta.length || !tb.length) return 0;\n  var setB = new Set(tb);\n  return ta.filter(function(t) { return setB.has(t); }).length / Math.max(ta.length, tb.length);\n}\n\nfunction extrairCampo(html, rotulo) {\n  var patterns = [\n    new RegExp(rotulo + '[^<]*<\\/b>\\\\s*<br\\\\s*\\/?>\\\\s*([^<]+)', 'i'),\n    new RegExp(rotulo + '[^<]*<\\/strong>\\\\s*<br\\\\s*\\/?>\\\\s*([^<]+)', 'i'),\n    new RegExp('<td[^>]*>\\\\s*' + rotulo + '[^<]*<\\/td>\\\\s*<td[^>]*>\\\\s*([^<]+)', 'i')\n  ];\n  for (var i = 0; i < patterns.length; i++) {\n    var m = html.match(patterns[i]);\n    if (m && m[1].trim()) return m[1].trim().replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\\s+/g,' ').trim();\n  }\n  return null;\n}\n\nfunction parsearConteudo(raw) {\n  var html = (raw || '').replace(/\\r?\\n/g, ' ');\n  var texto = html.replace(/<[^>]+>/g,' ').replace(/&[^;]+;/g,' ').replace(/\\s+/g,' ');\n  var nome = extrairCampo(html, 'Nome Completo') || extrairCampo(texto, 'Nome Completo');\n  var tipo = extrairCampo(html, 'Tipo de Solicita') || extrairCampo(texto, 'Tipo de Solicita');\n  var matr = extrairCampo(html, 'Matr') || extrairCampo(texto, 'Matr');\n  var cargo = extrairCampo(html, 'Cargo') || extrairCampo(texto, 'Cargo');\n  var login = extrairCampo(html, 'Login para Bloqueio') || extrairCampo(texto, 'Login para Bloqueio');\n  if (!nome) {\n    var m2 = texto.match(/Nome Completo\\s+([A-Za-z\\u00C0-\\u00FF][a-z\\u00C0-\\u00FF]+(?:\\s+[A-Za-z\\u00C0-\\u00FF][a-z\\u00C0-\\u00FF]+)+)/);\n    if (m2) nome = m2[1].trim();\n  }\n  if (!tipo) {\n    if (/demiss/i.test(texto)) tipo = 'Demissao';\n    else if (/f.rias/i.test(texto)) tipo = 'Ferias';\n  }\n  return { nome: nome, tipo: tipo || 'Desconhecido', matr: matr || '', cargo: cargo || '', login: login || '' };\n}\n\nvar SCORE_MIN = 0.5;\nvar resultados = [];\n\nfor (var k = 0; k < items.length; k++) {\n  var item = items[k];\n  var ticketId = Number(item['1'] || item['id'] || 0);\n  if (!ticketId || processedIds.has(ticketId)) continue;\n\n  var content = String(item['21'] || '');\n  var parsed = parsearConteudo(content);\n  var nome = parsed.nome, tipo = parsed.tipo, matr = parsed.matr, cargo = parsed.cargo, login = parsed.login;\n  if (!nome) continue;\n\n  var isDemissao = /demiss/i.test(tipo);\n\n  var matches = isDemissao\n    ? todosAtivos\n        .map(function(a) { return Object.assign({}, a, { _score: scoreSimilaridade(nome, a.employee_name) }); })\n        .filter(function(a) { return a._score >= SCORE_MIN; })\n        .sort(function(a, b) { return b._score - a._score; })\n    : [];\n\n  var nota = isDemissao\n    ? (matches.length > 0\n        ? 'AssetAgro: ' + matches.length + ' ativo(s) de ' + nome + ' movidos para STOCK:\\n' +\n          matches.map(function(a) { return '- ' + a.service_tag + ' (' + (a._score*100).toFixed(0) + '% match)'; }).join('\\n')\n        : 'AssetAgro: nenhum ativo encontrado para ' + nome + '. Verificar manualmente.')\n    : 'AssetAgro: tipo ' + tipo + ' - sem alteracao de ativos.';\n\n  var matchedIdsSql = matches.length > 0\n    ? matches.map(function(a) { return \"'\" + String(a.id).replace(/'/g, '') + \"'\"; }).join(',')\n    : \"'00000000-0000-0000-0000-000000000000'\";\n\n  resultados.push({\n    ticketId: ticketId,\n    nome: nome,\n    tipo: tipo,\n    matr: matr,\n    cargo: cargo,\n    login: login,\n    isDemissao: isDemissao,\n    matchedIdsSql: matchedIdsSql,\n    sessionToken: sessionToken,\n    nota: nota,\n    ativos: matches.map(function(a) {\n      return { service_tag: a.service_tag, model: a.model, equipment_type: a.equipment_type, score: (a._score*100).toFixed(0)+'%' };\n    }),\n    temAtivos: matches.length > 0,\n    totalAtivos: matches.length\n  });\n}\n\nreturn resultados.map(function(r) { return { json: r }; });"
+      },
+      "id": "node-main-logic",
+      "name": "Processar Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE assets SET status = 'STOCK', updated_at = NOW() WHERE id IN ({{ $json.matchedIdsSql }}) AND status = 'IN_USE'",
+        "options": {}
+      },
+      "id": "node-update-assets",
+      "name": "Atualizar Ativos STOCK",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1740, 400],
+      "credentials": {
+        "mySql": {
+          "id": "CREDENTIAL_ASSETAGRO_MYSQL",
+          "name": "AssetAgro MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT IGNORE INTO glpi_desligamentos (glpi_ticket_id, colaborador_nome, tipo, ativos_atualizados) VALUES ({{ $json.ticketId }}, '{{ $json.nome.replace(/'/g, \"''\") }}', '{{ $json.tipo }}', {{ $json.totalAtivos }})",
+        "options": {}
+      },
+      "id": "node-record-processed",
+      "name": "Registrar Processado",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1960, 400],
+      "credentials": {
+        "mySql": {
+          "id": "CREDENTIAL_ASSETAGRO_MYSQL",
+          "name": "AssetAgro MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.90.5:3003/api/glpi/proxy",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-webhook-key", "value": "445f35592e9fe8fc39fb41a47a3435b34eec21b09ac44d049c4f3f0ecb1fbe5d" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{ JSON.stringify({ path: '/ITILFollowup', method: 'POST', headers: { 'Session-Token': $json.sessionToken }, body: { input: { items_id: $json.ticketId, itemtype: 'Ticket', content: $json.nota, is_private: 0 } } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "node-glpi-followup",
+      "name": "Nota no GLPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2180, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isDemissao }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-if-demissao",
+      "name": "E Demissao?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2400, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "var d = $input.first().json;\nvar ativos = d.ativos || [];\nvar badge = d.temAtivos ? (d.totalAtivos + ' equipamento(s) aguardando devolucao') : 'Nenhum equipamento encontrado no sistema';\nvar badgeColor = d.temAtivos ? '#f59e0b' : '#10b981';\n\nvar linhasAtivos = ativos.length > 0\n  ? ativos.map(function(a) {\n      return '<tr>' +\n        '<td style=\"padding:8px 12px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:13px\">' + a.service_tag + '</td>' +\n        '<td style=\"padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px\">' + a.model + '</td>' +\n        '<td style=\"padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px\">' + a.equipment_type + '</td>' +\n        '<td style=\"padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#64748b\">' + a.score + '</td>' +\n        '</tr>';\n    }).join('')\n  : '<tr><td colspan=\"4\" style=\"padding:12px;color:#64748b;text-align:center;font-size:13px\">Nenhum ativo IN_USE encontrado - verificar manualmente</td></tr>';\n\nvar html = '<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"></head>' +\n'<body style=\"margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif\">' +\n'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;padding:32px 0\"><tr><td align=\"center\">' +\n'<table width=\"620\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)\">' +\n'<tr><td style=\"background:#dc2626;padding:28px 32px\">' +\n'<h1 style=\"margin:0;color:#fff;font-size:22px;font-weight:700\">Colaborador Desligado</h1>' +\n'<p style=\"margin:6px 0 0;color:#fecaca;font-size:14px\">Deteccao automatica via GLPI - AssetAgro</p>' +\n'</td></tr>' +\n'<tr><td style=\"padding:20px 32px 0\">' +\n'<div style=\"padding:12px 16px;background:' + badgeColor + '15;border-left:4px solid ' + badgeColor + ';border-radius:4px\">' +\n'<span style=\"color:' + badgeColor + ';font-weight:600;font-size:14px\">' + badge + '</span>' +\n'</div></td></tr>' +\n'<tr><td style=\"padding:24px 32px 0\">' +\n'<h2 style=\"margin:0 0 14px;font-size:16px;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:8px\">Dados do Colaborador</h2>' +\n'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">' +\n'<tr><td width=\"38%\" style=\"padding:5px 0;color:#64748b;font-size:13px\">Nome</td><td style=\"padding:5px 0;font-weight:600;color:#1e293b;font-size:14px\">' + d.nome + '</td></tr>' +\n'<tr><td style=\"padding:5px 0;color:#64748b;font-size:13px\">Cargo</td><td style=\"padding:5px 0;color:#1e293b;font-size:14px\">' + (d.cargo || '-') + '</td></tr>' +\n'<tr><td style=\"padding:5px 0;color:#64748b;font-size:13px\">Matricula</td><td style=\"padding:5px 0;color:#1e293b;font-size:14px\">' + (d.matr || '-') + '</td></tr>' +\n'<tr><td style=\"padding:5px 0;color:#64748b;font-size:13px\">Login</td><td style=\"padding:5px 0;font-family:monospace;color:#1e293b;font-size:13px\">' + (d.login || '-') + '</td></tr>' +\n'<tr><td style=\"padding:5px 0;color:#64748b;font-size:13px\">Chamado GLPI</td><td style=\"padding:5px 0;color:#1e293b;font-size:14px\">#' + d.ticketId + '</td></tr>' +\n'</table></td></tr>' +\n'<tr><td style=\"padding:24px 32px 0\">' +\n'<h2 style=\"margin:0 0 14px;font-size:16px;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:8px\">Equipamentos no AssetAgro</h2>' +\n'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0;border-radius:8px;overflow:hidden\">' +\n'<thead><tr style=\"background:#f8fafc\">' +\n'<th style=\"padding:9px 12px;text-align:left;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0\">SERVICE TAG</th>' +\n'<th style=\"padding:9px 12px;text-align:left;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0\">MODELO</th>' +\n'<th style=\"padding:9px 12px;text-align:left;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0\">TIPO</th>' +\n'<th style=\"padding:9px 12px;text-align:left;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0\">MATCH</th>' +\n'</tr></thead><tbody>' + linhasAtivos + '</tbody></table>' +\n(d.temAtivos ? '<p style=\"margin:8px 0 0;font-size:12px;color:#64748b\">Status atualizado para STOCK no AssetAgro.</p>' : '') +\n'</td></tr>' +\n'<tr><td style=\"padding:28px 32px;border-top:1px solid #e2e8f0\">' +\n'<p style=\"margin:0;font-size:11px;color:#94a3b8;text-align:center\">Mensagem automatica - AssetAgro / Tracbel Agro TI - Nao responda este email.</p>' +\n'</td></tr></table></td></tr></table></body></html>';\n\nvar assunto = '[AssetAgro] Desligamento: ' + d.nome + ' - ' + d.totalAtivos + ' equipamento(s) pendente(s)';\nreturn [{ json: { html: html, assunto: assunto, dados: d } }];"
+      },
+      "id": "node-build-email",
+      "name": "Montar Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2620, 280]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply_agro@tracbel.com.br",
+        "toEmail": "ricardocoradini97@tracbel.com.br,caio.campos@tracbel.com.br",
+        "subject": "={{ $json.assunto }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": { "appendAttribution": false }
+      },
+      "id": "node-send-email",
+      "name": "Enviar Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [2840, 280],
+      "credentials": {
+        "smtp": {
+          "id": "SUBSTITUIR_PELO_ID_SMTP",
+          "name": "Office 365 - noreply_agro"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "A cada 15 minutos": {
+      "main": [[{ "node": "Criar Tabela Tracking", "type": "main", "index": 0 }]]
+    },
+    "Criar Tabela Tracking": {
+      "main": [[{ "node": "IDs Processados", "type": "main", "index": 0 }]]
+    },
+    "IDs Processados": {
+      "main": [[{ "node": "Ativos IN_USE", "type": "main", "index": 0 }]]
+    },
+    "Ativos IN_USE": {
+      "main": [[{ "node": "GLPI initSession", "type": "main", "index": 0 }]]
+    },
+    "GLPI initSession": {
+      "main": [[{ "node": "Buscar Chamados GLPI", "type": "main", "index": 0 }]]
+    },
+    "Buscar Chamados GLPI": {
+      "main": [[{ "node": "Processar Tickets", "type": "main", "index": 0 }]]
+    },
+    "Processar Tickets": {
+      "main": [[{ "node": "Atualizar Ativos STOCK", "type": "main", "index": 0 }]]
+    },
+    "Atualizar Ativos STOCK": {
+      "main": [[{ "node": "Registrar Processado", "type": "main", "index": 0 }]]
+    },
+    "Registrar Processado": {
+      "main": [[{ "node": "Nota no GLPI", "type": "main", "index": 0 }]]
+    },
+    "Nota no GLPI": {
+      "main": [[{ "node": "E Demissao?", "type": "main", "index": 0 }]]
+    },
+    "E Demissao?": {
+      "main": [
+        [{ "node": "Montar Email HTML", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Montar Email HTML": {
+      "main": [[{ "node": "Enviar Email", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "AssetAgro" }, { "name": "Desligamento" }],
+  "triggerCount": 1
+}

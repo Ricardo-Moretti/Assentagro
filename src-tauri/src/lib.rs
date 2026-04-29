@@ -98,6 +98,20 @@ pub fn run() {
             commands::criar_ativo,
             commands::atualizar_ativo,
             commands::excluir_ativo,
+            // OCS — Saúde e Softwares
+            commands::obter_live_data,
+            commands::listar_softwares_ativo,
+            // Fornecedores
+            commands::listar_fornecedores,
+            commands::criar_fornecedor,
+            commands::atualizar_fornecedor,
+            commands::excluir_fornecedor,
+            // Licenças de Software
+            commands::listar_licencas,
+            commands::listar_uso_licencas,
+            commands::criar_licenca,
+            commands::atualizar_licenca,
+            commands::excluir_licenca,
             // Dashboard
             commands::obter_dados_dashboard,
             // Exportação
@@ -159,6 +173,7 @@ pub fn run() {
             // Utilitário
             commands::escrever_arquivo,
             commands::escrever_arquivo_usuario,
+            commands::ler_arquivo_bytes,
             // Verificação de conexão
             commands::verificar_conexao,
             // Empréstimos / Retiradas

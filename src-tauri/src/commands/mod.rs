@@ -126,6 +126,80 @@ pub fn excluir_ativo(state: State<'_, AppState>, id: String, usuario: String, ro
     queries::excluir_ativo(&mut conn, &id, &usuario).map_err(err)
 }
 
+#[tauri::command]
+pub fn obter_live_data(state: State<'_, AppState>, id: String) -> Result<AssetLiveData, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::obter_live_data(&mut conn, &id).map_err(err)
+}
+
+#[tauri::command]
+pub fn listar_softwares_ativo(state: State<'_, AppState>, id: String) -> Result<Vec<AssetSoftware>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_softwares_ativo(&mut conn, &id).map_err(err)
+}
+
+// ============================================================
+// Fornecedores
+// ============================================================
+
+#[tauri::command]
+pub fn listar_fornecedores(state: State<'_, AppState>) -> Result<Vec<Vendor>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_fornecedores(&mut conn).map_err(err)
+}
+
+#[tauri::command]
+pub fn criar_fornecedor(state: State<'_, AppState>, dados: CreateVendorDto) -> Result<Vendor, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::criar_fornecedor(&mut conn, &dados).map_err(err)
+}
+
+#[tauri::command]
+pub fn atualizar_fornecedor(state: State<'_, AppState>, id: String, dados: UpdateVendorDto) -> Result<Vendor, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::atualizar_fornecedor(&mut conn, &id, &dados).map_err(err)
+}
+
+#[tauri::command]
+pub fn excluir_fornecedor(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::excluir_fornecedor(&mut conn, &id).map_err(err)
+}
+
+// ============================================================
+// Licenças de Software
+// ============================================================
+
+#[tauri::command]
+pub fn listar_licencas(state: State<'_, AppState>) -> Result<Vec<SoftwareLicense>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_licencas(&mut conn).map_err(err)
+}
+
+#[tauri::command]
+pub fn listar_uso_licencas(state: State<'_, AppState>) -> Result<Vec<SoftwareLicenseUsage>, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::listar_uso_licencas(&mut conn).map_err(err)
+}
+
+#[tauri::command]
+pub fn criar_licenca(state: State<'_, AppState>, dados: CreateSoftwareLicenseDto) -> Result<SoftwareLicense, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::criar_licenca(&mut conn, &dados).map_err(err)
+}
+
+#[tauri::command]
+pub fn atualizar_licenca(state: State<'_, AppState>, id: String, dados: UpdateSoftwareLicenseDto) -> Result<SoftwareLicense, String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::atualizar_licenca(&mut conn, &id, &dados).map_err(err)
+}
+
+#[tauri::command]
+pub fn excluir_licenca(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let mut conn = state.db.get_conn().map_err(|e| e.to_string())?;
+    queries::excluir_licenca(&mut conn, &id).map_err(err)
+}
+
 // ============================================================
 // Dashboard
 // ============================================================
@@ -581,6 +655,11 @@ pub fn escrever_arquivo(state: State<'_, AppState>, caminho: String, dados: Vec<
             .map_err(|e| format!("Falha ao criar diretório: {}", e))?;
     }
     std::fs::write(&safe_path, &dados).map_err(|e| format!("Falha ao salvar arquivo: {}", e))
+}
+
+#[tauri::command]
+pub fn ler_arquivo_bytes(caminho: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&caminho).map_err(|e| format!("Falha ao ler arquivo: {}", e))
 }
 
 #[tauri::command]

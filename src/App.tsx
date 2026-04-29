@@ -31,6 +31,8 @@ import { DescartePage } from '@/features/disposal/pages/DescartePage';
 import { DesligadosPage } from '@/features/desligados/pages/DesligadosPage';
 import { TrashPage } from '@/features/trash/pages/TrashPage';
 import { TermosPage } from '@/features/termos/pages/TermosPage';
+import { VendorsPage } from '@/features/vendors/pages/VendorsPage';
+import { SoftwareLicensesPage } from '@/features/software-licenses/pages/SoftwareLicensesPage';
 import { verificarBackupAutomatico, registrarAcesso } from '@/data/commands';
 
 const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
@@ -73,6 +75,8 @@ const ViewRouter: React.FC<{ view: AppView }> = ({ view }) => {
       return <TrashPage />;
     case 'termos':
       return <TermosPage />;
+    case 'vendors': return <VendorsPage />;
+    case 'software-licenses': return <SoftwareLicensesPage />;
     default:
       return <DashboardPage />;
   }

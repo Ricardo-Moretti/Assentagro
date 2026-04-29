@@ -447,6 +447,42 @@ pub fn executar_migracoes(conn: &mut PooledConn) -> Result<()> {
         info!("Migracao 017 concluida.");
     }
 
+    // Migration 018 — Fornecedores, financeiro e licenças de software
+    if versao_atual < 18 {
+        let _ = conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS vendors (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                contact_name VARCHAR(255) NULL,
+                phone VARCHAR(50) NULL,
+                email VARCHAR(255) NULL,
+                website VARCHAR(255) NULL,
+                notes TEXT NULL,
+                created_at VARCHAR(30) NOT NULL,
+                updated_at VARCHAR(30) NOT NULL
+            )"
+        );
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN purchase_cost DECIMAL(10,2) NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN purchase_date VARCHAR(30) NULL");
+        let _ = conn.query_drop("ALTER TABLE assets ADD COLUMN vendor_id VARCHAR(36) NULL");
+        let _ = conn.query_drop(
+            "CREATE TABLE IF NOT EXISTS software_licenses (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                publisher VARCHAR(255) NULL,
+                license_type VARCHAR(50) NOT NULL DEFAULT 'PER_SEAT',
+                quantity_purchased INT NOT NULL DEFAULT 0,
+                cost_per_unit DECIMAL(10,2) NULL,
+                purchase_date VARCHAR(30) NULL,
+                expiry_date VARCHAR(30) NULL,
+                notes TEXT NULL,
+                created_at VARCHAR(30) NOT NULL,
+                updated_at VARCHAR(30) NOT NULL
+            )"
+        );
+        conn.query_drop("INSERT IGNORE INTO schema_version (version) VALUES (18)")?;
+    }
+
     // Seed default admin user
     seed_admin_user(conn)?;
 

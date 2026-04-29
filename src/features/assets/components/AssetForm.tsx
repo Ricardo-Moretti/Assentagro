@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ArrowLeft, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,8 @@ import { Autocomplete } from '@/components/ui/Autocomplete';
 import { useAssetForm } from '../hooks/useAssetForm';
 import { useAppStore } from '@/stores/useAppStore';
 import { useToast } from '@/components/ui/Toast';
+import { listarFornecedores } from '@/data/commands';
+import type { Vendor } from '@/domain/models';
 import {
   BRANCHES,
   EQUIPMENT_TYPES,
@@ -30,6 +32,11 @@ export const AssetForm: React.FC<AssetFormProps> = ({ initial }) => {
   const { toast } = useToast();
   const [customRam, setCustomRam] = useState(false);
   const [customStorage, setCustomStorage] = useState(false);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+
+  useEffect(() => {
+    listarFornecedores().then(setVendors).catch(() => {});
+  }, []);
 
   const isEditing = !!initial;
 
@@ -286,6 +293,50 @@ export const AssetForm: React.FC<AssetFormProps> = ({ initial }) => {
         placeholder="Informações adicionais sobre o equipamento..."
         rows={3}
       />
+
+      {/* Garantia */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Início da Garantia"
+          type="date"
+          value={form.warranty_start ?? ''}
+          onChange={(e) => setField('warranty_start', e.target.value || null)}
+        />
+        <Input
+          label="Fim da Garantia"
+          type="date"
+          value={form.warranty_end ?? ''}
+          onChange={(e) => setField('warranty_end', e.target.value || null)}
+        />
+      </div>
+
+      {/* Financeiro e Fornecedor */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
+          label="Valor de Compra (R$)"
+          type="number"
+          min={0}
+          step={0.01}
+          value={form.purchase_cost ?? ''}
+          onChange={(e) => setField('purchase_cost', e.target.value ? parseFloat(e.target.value) : null)}
+          placeholder="Ex: 3500.00"
+        />
+        <Input
+          label="Data de Compra"
+          type="date"
+          value={form.purchase_date ?? ''}
+          onChange={(e) => setField('purchase_date', e.target.value || null)}
+        />
+        <Select
+          label="Fornecedor"
+          value={form.vendor_id ?? ''}
+          onChange={(e) => setField('vendor_id', e.target.value || null)}
+          options={[
+            { value: '', label: 'Nenhum' },
+            ...vendors.map((v) => ({ value: v.id, label: v.name })),
+          ]}
+        />
+      </div>
 
       {/* Botão de submissão */}
       <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">

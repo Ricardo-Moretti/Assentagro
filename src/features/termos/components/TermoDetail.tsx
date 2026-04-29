@@ -15,11 +15,29 @@ import {
   d4signEnviarParaAssinatura,
   d4signConsultarStatus,
   d4signBaixarAssinado,
+  lerArquivoBytes,
 } from '@/data/commands';
 import { gerarPdfTermo } from './gerarPdfTermo';
 import { appDataDir } from '@tauri-apps/api/path';
-import { readFile } from '@tauri-apps/plugin-fs';
 import type { Termo, StatusTermo } from '@/domain/models';
+
+// O PDF pode ter sido gerado em outra máquina (outro usuário Windows).
+// Tenta o path salvo; se não existir, reconstrói usando appDataDir local + nome do arquivo.
+async function lerPdfLocal(pathSalvo: string): Promise<ArrayBuffer> {
+  async function toBuffer(bytes: number[]): Promise<ArrayBuffer> {
+    return new Uint8Array(bytes).buffer as ArrayBuffer;
+  }
+  try {
+    return toBuffer(await lerArquivoBytes(pathSalvo));
+  } catch {
+    const sep = pathSalvo.includes('\\') ? '\\' : '/';
+    const filename = pathSalvo.split(sep).pop()!;
+    const dir = await appDataDir();
+    const dirSep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '/';
+    const localPath = `${dir}${dirSep}termos/${filename}`;
+    return toBuffer(await lerArquivoBytes(localPath));
+  }
+}
 
 interface Props {
   termo: Termo;
@@ -344,7 +362,7 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
                 className="w-full"
                 onClick={async () => {
                   try {
-                    const bytes = await readFile(termo.arquivo_gerado!);
+                    const bytes = await lerPdfLocal(termo.arquivo_gerado!);
                     const blob = new Blob([bytes], { type: 'application/pdf' });
                     const url = URL.createObjectURL(blob);
                     setPdfBlobUrl(url);
@@ -375,7 +393,7 @@ export const TermoDetail: React.FC<Props> = ({ termo, onBack, onRefresh }) => {
                 className="w-full text-emerald-600"
                 onClick={async () => {
                   try {
-                    const bytes = await readFile(termo.arquivo_assinado!);
+                    const bytes = await lerPdfLocal(termo.arquivo_assinado!);
                     const blob = new Blob([bytes], { type: 'application/pdf' });
                     const url = URL.createObjectURL(blob);
                     setPdfBlobUrl(url);

@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # --- Configurações ---
-$Version      = "1.9.0"   # <-- atualizar junto com tauri.conf.json e Cargo.toml
+$Version      = "1.9.5"   # <-- atualizar junto com tauri.conf.json e Cargo.toml
 $ServerHost   = "192.168.90.5"
 $ServerPort   = 8765
 $ServerShare  = "\\$ServerHost\AssetAgro\updates"   # ajustar se necessário
@@ -39,9 +39,10 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
     $env:TAURI_SIGNING_PRIVATE_KEY = $env:TAURI_SIGNING_PRIVATE_KEY.Trim()
 }
 
-# Senha da chave — DEVE ser definida como variável de ambiente antes do deploy
-if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-    Write-Error "TAURI_SIGNING_PRIVATE_KEY_PASSWORD nao definida. Defina com: `$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = 'sua-senha'"
+# Senha da chave — usa string vazia se não definida (chave sem senha)
+if ($null -eq $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+    Write-Host "[deploy] TAURI_SIGNING_PRIVATE_KEY_PASSWORD nao definida, usando string vazia."
 }
 
 # --- 2. Apagar .sig antigo para garantir nova assinatura apos o build ---
@@ -63,7 +64,12 @@ $SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
 if (-not $SigFile) {
     Write-Host "[deploy] .sig não gerado pelo build - assinando manualmente..."
     $env:TAURI_SIGNING_PRIVATE_KEY = ""
-    npx tauri signer sign -f "src-tauri\assetagro.key" -p "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" $ExeFile.FullName
+    $KeyPath  = (Resolve-Path "src-tauri\assetagro.key").Path
+    $ExePath  = $ExeFile.FullName
+    $SigPass  = if ($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD } else { "" }
+    # Array splatting preserva string vazia como argumento explícito
+    $signArgs = @("tauri", "signer", "sign", "--private-key-path", $KeyPath, "--password", $SigPass, $ExePath)
+    & npx @signArgs
     if ($LASTEXITCODE -ne 0) { Write-Error "Falha ao assinar o instalador." }
     $SigFile = Get-Item "$($ExeFile.FullName).sig" -ErrorAction SilentlyContinue
     if (-not $SigFile) { Write-Error "Arquivo .sig não encontrado mesmo após assinatura manual." }

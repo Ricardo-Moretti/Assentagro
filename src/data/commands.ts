@@ -43,6 +43,15 @@ import type {
   UpdateTermoDto,
   D4SignConfig,
   SaveD4SignConfigDto,
+  AssetLiveData,
+  AssetSoftware,
+  Vendor,
+  CreateVendorDto,
+  UpdateVendorDto,
+  SoftwareLicense,
+  SoftwareLicenseUsage,
+  CreateSoftwareLicenseDto,
+  UpdateSoftwareLicenseDto,
 } from '@/domain/models';
 
 // Filiais
@@ -255,6 +264,10 @@ export const escreverArquivo = (caminho: string, dados: number[]): Promise<void>
 export const escreverArquivoUsuario = (caminho: string, dados: number[]): Promise<void> =>
   invoke('escrever_arquivo_usuario', { caminho, dados });
 
+// Lê qualquer arquivo do sistema de arquivos (sem restrição de escopo do plugin fs)
+export const lerArquivoBytes = (caminho: string): Promise<number[]> =>
+  invoke('ler_arquivo_bytes', { caminho });
+
 // Verificação de conexão
 export const verificarConexao = (): Promise<boolean> =>
   invoke('verificar_conexao');
@@ -394,3 +407,39 @@ export const d4signConsultarStatus = (documentoUuid: string): Promise<string> =>
 
 export const d4signBaixarAssinado = (documentoUuid: string, destino: string): Promise<string> =>
   invoke('d4sign_baixar_assinado', { documentoUuid, destino });
+
+// OCS — Saúde e Softwares
+export const obterLiveData = (id: string): Promise<AssetLiveData> =>
+  invoke('obter_live_data', { id });
+
+export const listarSoftwaresAtivo = (id: string): Promise<AssetSoftware[]> =>
+  invoke('listar_softwares_ativo', { id });
+
+// Fornecedores
+export const listarFornecedores = (): Promise<Vendor[]> =>
+  invoke('listar_fornecedores');
+
+export const criarFornecedor = (dados: CreateVendorDto): Promise<Vendor> =>
+  invoke('criar_fornecedor', { dados });
+
+export const atualizarFornecedor = (id: string, dados: UpdateVendorDto): Promise<Vendor> =>
+  invoke('atualizar_fornecedor', { id, dados });
+
+export const excluirFornecedor = (id: string): Promise<void> =>
+  invoke('excluir_fornecedor', { id });
+
+// Licenças de Software
+export const listarLicencas = (): Promise<SoftwareLicense[]> =>
+  invoke('listar_licencas');
+
+export const listarUsoLicencas = (): Promise<SoftwareLicenseUsage[]> =>
+  invoke('listar_uso_licencas');
+
+export const criarLicenca = (dados: CreateSoftwareLicenseDto): Promise<SoftwareLicense> =>
+  invoke('criar_licenca', { dados });
+
+export const atualizarLicenca = (id: string, dados: UpdateSoftwareLicenseDto): Promise<SoftwareLicense> =>
+  invoke('atualizar_licenca', { id, dados });
+
+export const excluirLicenca = (id: string): Promise<void> =>
+  invoke('excluir_licenca', { id });

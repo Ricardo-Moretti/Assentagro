@@ -29,6 +29,8 @@ const VIEW_TITLES: Record<AppView, string> = {
   trash: 'Lixeira',
   termos: 'Termos de Responsabilidade',
   'd4sign-config': 'Configuracao D4Sign',
+  vendors: 'Fornecedores',
+  'software-licenses': 'Licenças de Software',
 };
 
 export const Topbar: React.FC = () => {

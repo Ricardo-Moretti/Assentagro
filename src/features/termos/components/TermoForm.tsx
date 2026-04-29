@@ -42,7 +42,8 @@ export const TermoForm: React.FC<Props> = ({ onBack, onCreated }) => {
   };
 
   const handleSubmit = async () => {
-    if (!colaboradorNome.trim()) {
+    const nomeEfetivo = colaboradorNome.trim() || empSearch.trim();
+    if (!nomeEfetivo) {
       toast('error', 'Informe o nome do colaborador');
       return;
     }
@@ -54,7 +55,7 @@ export const TermoForm: React.FC<Props> = ({ onBack, onCreated }) => {
     try {
       await criarTermo(
         {
-          colaborador_nome: colaboradorNome.trim(),
+          colaborador_nome: nomeEfetivo,
           colaborador_email: colaboradorEmail.trim() || undefined,
           asset_ids: selectedAssetIds,
           tipo,

@@ -27,6 +27,10 @@ fn row_to_asset(row: mysql::Row) -> Asset {
         is_training: row.get::<i8, _>("is_training").unwrap_or(0) != 0,
         warranty_start: row.get("warranty_start").unwrap_or(None),
         warranty_end: row.get("warranty_end").unwrap_or(None),
+        purchase_cost: row.get("purchase_cost").unwrap_or(None),
+        purchase_date: row.get("purchase_date").unwrap_or(None),
+        vendor_id: row.get("vendor_id").unwrap_or(None),
+        vendor_name: row.get("vendor_name").unwrap_or(None),
         created_at: row.get("created_at").unwrap_or_default(),
         updated_at: row.get("updated_at").unwrap_or_default(),
     }
@@ -36,9 +40,11 @@ const ASSET_SELECT: &str =
     "SELECT a.id, a.service_tag, a.equipment_type, a.status, a.employee_name,
             a.branch_id, b.name as branch_name, a.ram_gb, a.storage_capacity_gb,
             a.storage_type, a.os, a.cpu, a.model, a.year, a.notes, a.is_training,
-            a.warranty_start, a.warranty_end, a.created_at, a.updated_at
+            a.warranty_start, a.warranty_end, a.created_at, a.updated_at,
+            a.purchase_cost, a.purchase_date, a.vendor_id, v.name as vendor_name
      FROM assets a
-     LEFT JOIN branches b ON b.id = a.branch_id";
+     LEFT JOIN branches b ON b.id = a.branch_id
+     LEFT JOIN vendors v ON v.id = a.vendor_id";
 
 const ASSET_NOT_DELETED: &str = "a.deleted_at IS NULL";
 
@@ -180,6 +186,61 @@ pub fn obter_ativo(conn: &mut PooledConn, id: &str) -> Result<Asset> {
         .ok_or_else(|| anyhow!("Ativo não encontrado"))
 }
 
+/// Busca dados ao vivo do OCS para um ativo (join assets + asset_live_data)
+pub fn obter_live_data(conn: &mut PooledConn, asset_id: &str) -> Result<AssetLiveData> {
+    let row: Option<mysql::Row> = conn
+        .exec_first(
+            "SELECT a.id AS asset_id, a.hostname, a.ip_address, a.last_logged_user,
+                    a.ocs_last_seen, a.ocs_synced_at,
+                    l.ram_total_mb, l.disk_c_total_mb, l.disk_c_free_mb
+             FROM assets a
+             LEFT JOIN asset_live_data l ON l.asset_id = a.id
+             WHERE a.id = ? AND a.deleted_at IS NULL",
+            (asset_id,),
+        )
+        .context("Falha ao buscar live data")?;
+
+    match row {
+        Some(r) => Ok(AssetLiveData {
+            asset_id: r.get("asset_id").unwrap_or_default(),
+            hostname: r.get("hostname").unwrap_or(None),
+            ip_address: r.get("ip_address").unwrap_or(None),
+            last_logged_user: r.get("last_logged_user").unwrap_or(None),
+            ocs_last_seen: r.get("ocs_last_seen").unwrap_or(None),
+            ocs_synced_at: r.get("ocs_synced_at").unwrap_or(None),
+            ram_total_mb: r.get("ram_total_mb").unwrap_or(None),
+            disk_c_total_mb: r.get("disk_c_total_mb").unwrap_or(None),
+            disk_c_free_mb: r.get("disk_c_free_mb").unwrap_or(None),
+        }),
+        None => Err(anyhow!("Ativo não encontrado")),
+    }
+}
+
+/// Lista softwares instalados de um ativo (via OCS sync)
+pub fn listar_softwares_ativo(conn: &mut PooledConn, asset_id: &str) -> Result<Vec<AssetSoftware>> {
+    let rows: Vec<mysql::Row> = conn
+        .exec(
+            "SELECT id, asset_id, name, version, publisher, install_date
+             FROM asset_software
+             WHERE asset_id = ?
+             ORDER BY name ASC",
+            (asset_id,),
+        )
+        .context("Falha ao listar softwares")?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| AssetSoftware {
+            id: r.get("id").unwrap_or_default(),
+            asset_id: r.get("asset_id").unwrap_or_default(),
+            name: r.get("name").unwrap_or_default(),
+            version: r.get("version").unwrap_or(None),
+            publisher: r.get("publisher").unwrap_or(None),
+            install_date: r.get("install_date").unwrap_or(None),
+        })
+        .collect())
+}
+
 /// Cria um novo ativo (com registro de auditoria)
 pub fn criar_ativo(conn: &mut PooledConn, dto: &CreateAssetDto, usuario: &str) -> Result<Asset> {
     // Validação: IN_USE exige employee_name
@@ -226,6 +287,9 @@ pub fn criar_ativo(conn: &mut PooledConn, dto: &CreateAssetDto, usuario: &str) -
         0i64.into(),
         dto.warranty_start.clone().into(),
         dto.warranty_end.clone().into(),
+        dto.purchase_cost.into(),
+        dto.purchase_date.clone().into(),
+        dto.vendor_id.clone().into(),
         now.clone().into(),
         now.clone().into(),
     ];
@@ -234,8 +298,10 @@ pub fn criar_ativo(conn: &mut PooledConn, dto: &CreateAssetDto, usuario: &str) -
         "INSERT INTO assets (id, service_tag, equipment_type, status, employee_name,
                              branch_id, ram_gb, storage_capacity_gb, storage_type,
                              os, cpu, model, year, notes, is_training,
-                             warranty_start, warranty_end, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                             warranty_start, warranty_end,
+                             purchase_cost, purchase_date, vendor_id,
+                             created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         mysql::Params::Positional(params),
     )
     .context("Falha ao criar ativo. Service Tag pode já existir.")?;
@@ -273,6 +339,9 @@ pub fn atualizar_ativo(conn: &mut PooledConn, id: &str, dto: &UpdateAssetDto, us
     let notes = dto.notes.as_deref().unwrap_or(&atual.notes);
     let warranty_start = if dto.warranty_start.is_some() { dto.warranty_start.as_deref() } else { atual.warranty_start.as_deref() };
     let warranty_end = if dto.warranty_end.is_some() { dto.warranty_end.as_deref() } else { atual.warranty_end.as_deref() };
+    let purchase_cost = if dto.purchase_cost.is_some() { dto.purchase_cost } else { atual.purchase_cost };
+    let purchase_date = if dto.purchase_date.is_some() { dto.purchase_date.as_deref() } else { atual.purchase_date.as_deref() };
+    let vendor_id = if dto.vendor_id.is_some() { dto.vendor_id.as_deref() } else { atual.vendor_id.as_deref() };
 
     // Validação: IN_USE exige employee_name
     if status == "IN_USE" {
@@ -317,6 +386,9 @@ pub fn atualizar_ativo(conn: &mut PooledConn, id: &str, dto: &UpdateAssetDto, us
         notes.to_string().into(),
         warranty_start.map(|s| s.to_string()).into(),
         warranty_end.map(|s| s.to_string()).into(),
+        purchase_cost.into(),
+        purchase_date.map(|s| s.to_string()).into(),
+        vendor_id.map(|s| s.to_string()).into(),
         now.clone().into(),
         id.to_string().into(),
     ];
@@ -326,7 +398,9 @@ pub fn atualizar_ativo(conn: &mut PooledConn, id: &str, dto: &UpdateAssetDto, us
             service_tag = ?, equipment_type = ?, status = ?, employee_name = ?,
             branch_id = ?, ram_gb = ?, storage_capacity_gb = ?, storage_type = ?,
             os = ?, cpu = ?, model = ?, year = ?, notes = ?,
-            warranty_start = ?, warranty_end = ?, updated_at = ?
+            warranty_start = ?, warranty_end = ?,
+            purchase_cost = ?, purchase_date = ?, vendor_id = ?,
+            updated_at = ?
          WHERE id = ?",
         mysql::Params::Positional(update_params),
     )
@@ -480,6 +554,9 @@ pub fn importar_ativos(
                     notes: dto.notes.clone(),
                     warranty_start: None,
                     warranty_end: None,
+                    purchase_cost: dto.purchase_cost,
+                    purchase_date: dto.purchase_date.clone(),
+                    vendor_id: dto.vendor_id.clone(),
                 };
                 match atualizar_ativo(conn, &existing_id, &update_dto, usuario) {
                     Ok(_) => result.updated += 1,
@@ -3083,6 +3160,192 @@ fn row_to_termo_ativo(r: mysql::Row) -> TermoAtivo {
         model: safe_opt(&r, 6),
         branch_name: safe_opt(&r, 7),
     }
+}
+
+// ============================================================
+// VENDORS — CRUD
+// ============================================================
+
+pub fn listar_fornecedores(conn: &mut PooledConn) -> Result<Vec<Vendor>> {
+    let rows: Vec<mysql::Row> = conn
+        .query("SELECT id, name, contact_name, phone, email, website, notes, created_at, updated_at FROM vendors ORDER BY name ASC")
+        .context("Falha ao listar fornecedores")?;
+    Ok(rows.into_iter().map(|r| Vendor {
+        id: r.get("id").unwrap_or_default(),
+        name: r.get("name").unwrap_or_default(),
+        contact_name: r.get("contact_name").unwrap_or(None),
+        phone: r.get("phone").unwrap_or(None),
+        email: r.get("email").unwrap_or(None),
+        website: r.get("website").unwrap_or(None),
+        notes: r.get("notes").unwrap_or_default(),
+        created_at: r.get("created_at").unwrap_or_default(),
+        updated_at: r.get("updated_at").unwrap_or_default(),
+    }).collect())
+}
+
+pub fn criar_fornecedor(conn: &mut PooledConn, dto: &CreateVendorDto) -> Result<Vendor> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    conn.exec_drop(
+        "INSERT INTO vendors (id, name, contact_name, phone, email, website, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (&id, &dto.name, &dto.contact_name, &dto.phone, &dto.email, &dto.website,
+         dto.notes.as_deref().unwrap_or(""), &now, &now),
+    ).context("Falha ao criar fornecedor")?;
+    Ok(Vendor {
+        id, name: dto.name.clone(),
+        contact_name: dto.contact_name.clone(),
+        phone: dto.phone.clone(),
+        email: dto.email.clone(),
+        website: dto.website.clone(),
+        notes: dto.notes.clone().unwrap_or_default(),
+        created_at: now.clone(), updated_at: now,
+    })
+}
+
+pub fn atualizar_fornecedor(conn: &mut PooledConn, id: &str, dto: &UpdateVendorDto) -> Result<Vendor> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let mut sets: Vec<String> = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<mysql::Value> = vec![mysql::Value::from(&now)];
+    if let Some(ref v) = dto.name        { sets.push("name = ?".to_string());         params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.contact_name{ sets.push("contact_name = ?".to_string()); params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.phone       { sets.push("phone = ?".to_string());        params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.email       { sets.push("email = ?".to_string());        params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.website     { sets.push("website = ?".to_string());      params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.notes       { sets.push("notes = ?".to_string());        params.push(mysql::Value::from(v)); }
+    params.push(mysql::Value::from(id));
+    let sql = format!("UPDATE vendors SET {} WHERE id = ?", sets.join(", "));
+    conn.exec_drop(&sql, mysql::Params::Positional(params)).context("Falha ao atualizar fornecedor")?;
+    let rows: Vec<mysql::Row> = conn.exec(
+        "SELECT id, name, contact_name, phone, email, website, notes, created_at, updated_at FROM vendors WHERE id = ?", (id,)
+    ).context("Falha ao buscar fornecedor")?;
+    rows.into_iter().next().map(|r| Vendor {
+        id: r.get("id").unwrap_or_default(),
+        name: r.get("name").unwrap_or_default(),
+        contact_name: r.get("contact_name").unwrap_or(None),
+        phone: r.get("phone").unwrap_or(None),
+        email: r.get("email").unwrap_or(None),
+        website: r.get("website").unwrap_or(None),
+        notes: r.get("notes").unwrap_or_default(),
+        created_at: r.get("created_at").unwrap_or_default(),
+        updated_at: r.get("updated_at").unwrap_or_default(),
+    }).ok_or_else(|| anyhow!("Fornecedor não encontrado"))
+}
+
+pub fn excluir_fornecedor(conn: &mut PooledConn, id: &str) -> Result<()> {
+    conn.exec_drop("DELETE FROM vendors WHERE id = ?", (id,))
+        .context("Falha ao excluir fornecedor")?;
+    Ok(())
+}
+
+// ============================================================
+// SOFTWARE LICENSES — CRUD + Usage
+// ============================================================
+
+pub fn listar_licencas(conn: &mut PooledConn) -> Result<Vec<SoftwareLicense>> {
+    let rows: Vec<mysql::Row> = conn
+        .query("SELECT id, name, publisher, license_type, quantity_purchased, cost_per_unit, purchase_date, expiry_date, notes, created_at, updated_at FROM software_licenses ORDER BY name ASC")
+        .context("Falha ao listar licenças")?;
+    Ok(rows.into_iter().map(|r| SoftwareLicense {
+        id: r.get("id").unwrap_or_default(),
+        name: r.get("name").unwrap_or_default(),
+        publisher: r.get("publisher").unwrap_or(None),
+        license_type: r.get("license_type").unwrap_or_default(),
+        quantity_purchased: r.get("quantity_purchased").unwrap_or(0),
+        cost_per_unit: r.get("cost_per_unit").unwrap_or(None),
+        purchase_date: r.get("purchase_date").unwrap_or(None),
+        expiry_date: r.get("expiry_date").unwrap_or(None),
+        notes: r.get("notes").unwrap_or_default(),
+        created_at: r.get("created_at").unwrap_or_default(),
+        updated_at: r.get("updated_at").unwrap_or_default(),
+    }).collect())
+}
+
+pub fn listar_uso_licencas(conn: &mut PooledConn) -> Result<Vec<SoftwareLicenseUsage>> {
+    let rows: Vec<mysql::Row> = conn
+        .query(
+            "SELECT sl.id, sl.name, sl.publisher, sl.license_type,
+                    sl.quantity_purchased, sl.cost_per_unit, sl.expiry_date, sl.notes,
+                    COUNT(DISTINCT asw.asset_id) as quantity_installed
+             FROM software_licenses sl
+             LEFT JOIN asset_software asw ON LOWER(asw.name) LIKE CONCAT('%', LOWER(sl.name), '%')
+             GROUP BY sl.id
+             ORDER BY sl.name ASC"
+        )
+        .context("Falha ao buscar uso de licenças")?;
+    Ok(rows.into_iter().map(|r| SoftwareLicenseUsage {
+        id: r.get("id").unwrap_or_default(),
+        name: r.get("name").unwrap_or_default(),
+        publisher: r.get("publisher").unwrap_or(None),
+        license_type: r.get("license_type").unwrap_or_default(),
+        quantity_purchased: r.get("quantity_purchased").unwrap_or(0),
+        quantity_installed: r.get("quantity_installed").unwrap_or(0),
+        cost_per_unit: r.get("cost_per_unit").unwrap_or(None),
+        expiry_date: r.get("expiry_date").unwrap_or(None),
+        notes: r.get("notes").unwrap_or_default(),
+    }).collect())
+}
+
+pub fn criar_licenca(conn: &mut PooledConn, dto: &CreateSoftwareLicenseDto) -> Result<SoftwareLicense> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let license_type = dto.license_type.as_deref().unwrap_or("PER_SEAT");
+    conn.exec_drop(
+        "INSERT INTO software_licenses (id, name, publisher, license_type, quantity_purchased, cost_per_unit, purchase_date, expiry_date, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (&id, &dto.name, &dto.publisher, license_type, dto.quantity_purchased,
+         &dto.cost_per_unit, &dto.purchase_date, &dto.expiry_date,
+         dto.notes.as_deref().unwrap_or(""), &now, &now),
+    ).context("Falha ao criar licença")?;
+    Ok(SoftwareLicense {
+        id, name: dto.name.clone(), publisher: dto.publisher.clone(),
+        license_type: license_type.to_string(),
+        quantity_purchased: dto.quantity_purchased,
+        cost_per_unit: dto.cost_per_unit,
+        purchase_date: dto.purchase_date.clone(),
+        expiry_date: dto.expiry_date.clone(),
+        notes: dto.notes.clone().unwrap_or_default(),
+        created_at: now.clone(), updated_at: now,
+    })
+}
+
+pub fn atualizar_licenca(conn: &mut PooledConn, id: &str, dto: &UpdateSoftwareLicenseDto) -> Result<SoftwareLicense> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let mut sets: Vec<String> = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<mysql::Value> = vec![mysql::Value::from(&now)];
+    if let Some(ref v) = dto.name              { sets.push("name = ?".to_string());              params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.publisher         { sets.push("publisher = ?".to_string());         params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.license_type      { sets.push("license_type = ?".to_string());      params.push(mysql::Value::from(v)); }
+    if let Some(v)     = dto.quantity_purchased{ sets.push("quantity_purchased = ?".to_string()); params.push(mysql::Value::from(v)); }
+    if let Some(v)     = dto.cost_per_unit     { sets.push("cost_per_unit = ?".to_string());     params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.purchase_date     { sets.push("purchase_date = ?".to_string());     params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.expiry_date       { sets.push("expiry_date = ?".to_string());       params.push(mysql::Value::from(v)); }
+    if let Some(ref v) = dto.notes             { sets.push("notes = ?".to_string());             params.push(mysql::Value::from(v)); }
+    params.push(mysql::Value::from(id));
+    let sql = format!("UPDATE software_licenses SET {} WHERE id = ?", sets.join(", "));
+    conn.exec_drop(&sql, mysql::Params::Positional(params)).context("Falha ao atualizar licença")?;
+    let rows: Vec<mysql::Row> = conn.exec(
+        "SELECT id, name, publisher, license_type, quantity_purchased, cost_per_unit, purchase_date, expiry_date, notes, created_at, updated_at FROM software_licenses WHERE id = ?", (id,)
+    ).context("Falha ao buscar licença")?;
+    rows.into_iter().next().map(|r| SoftwareLicense {
+        id: r.get("id").unwrap_or_default(),
+        name: r.get("name").unwrap_or_default(),
+        publisher: r.get("publisher").unwrap_or(None),
+        license_type: r.get("license_type").unwrap_or_default(),
+        quantity_purchased: r.get("quantity_purchased").unwrap_or(0),
+        cost_per_unit: r.get("cost_per_unit").unwrap_or(None),
+        purchase_date: r.get("purchase_date").unwrap_or(None),
+        expiry_date: r.get("expiry_date").unwrap_or(None),
+        notes: r.get("notes").unwrap_or_default(),
+        created_at: r.get("created_at").unwrap_or_default(),
+        updated_at: r.get("updated_at").unwrap_or_default(),
+    }).ok_or_else(|| anyhow!("Licença não encontrada"))
+}
+
+pub fn excluir_licenca(conn: &mut PooledConn, id: &str) -> Result<()> {
+    conn.exec_drop("DELETE FROM software_licenses WHERE id = ?", (id,))
+        .context("Falha ao excluir licença")?;
+    Ok(())
 }
 
 

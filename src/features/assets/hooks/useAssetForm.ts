@@ -26,6 +26,9 @@ export function useAssetForm(initial?: Asset) {
           notes: initial.notes || '',
           warranty_start: initial.warranty_start || null,
           warranty_end: initial.warranty_end || null,
+          purchase_cost: initial.purchase_cost ?? null,
+          purchase_date: initial.purchase_date ?? null,
+          vendor_id: initial.vendor_id ?? null,
         }
       : {
           equipment_type: 'NOTEBOOK',

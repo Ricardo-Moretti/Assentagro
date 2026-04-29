@@ -19,6 +19,8 @@ import {
   UserX,
   RotateCcw,
   FileSignature,
+  Building2,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/useAppStore';
@@ -44,6 +46,8 @@ const navItems: NavItem[] = [
   { view: 'training', label: 'Treinamento', icon: <GraduationCap className="h-5 w-5" /> },
   { view: 'loans', label: 'Empréstimos', icon: <ArrowRightLeft className="h-5 w-5" /> },
   { view: 'notes', label: 'Observações', icon: <StickyNote className="h-5 w-5" /> },
+  { view: 'vendors', label: 'Fornecedores', icon: <Building2 className="h-5 w-5" /> },
+  { view: 'software-licenses', label: 'Licenças', icon: <ShieldCheck className="h-5 w-5" /> },
   { view: 'desligados', label: 'Desligados', icon: <UserX className="h-5 w-5" /> },
   { view: 'termos', label: 'Termos', icon: <FileSignature className="h-5 w-5" /> },
   { view: 'disposal', label: 'Descarte', icon: <Trash2 className="h-5 w-5" /> },

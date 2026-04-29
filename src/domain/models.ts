@@ -30,7 +30,9 @@ export type AppView =
   | 'desligados'
   | 'trash'
   | 'termos'
-  | 'd4sign-config';
+  | 'd4sign-config'
+  | 'vendors'
+  | 'software-licenses';
 
 export interface Branch {
   id: string;
@@ -56,6 +58,10 @@ export interface Asset {
   is_training: boolean;
   warranty_start: string | null;
   warranty_end: string | null;
+  purchase_cost: number | null;
+  purchase_date: string | null;
+  vendor_id: string | null;
+  vendor_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +75,27 @@ export interface DeletedAsset {
   model: string;
   deleted_at: string;
   deleted_by: string;
+}
+
+export interface AssetLiveData {
+  asset_id: string;
+  hostname: string | null;
+  ip_address: string | null;
+  last_logged_user: string | null;
+  ocs_last_seen: string | null;
+  ocs_synced_at: string | null;
+  ram_total_mb: number | null;
+  disk_c_total_mb: number | null;
+  disk_c_free_mb: number | null;
+}
+
+export interface AssetSoftware {
+  id: string;
+  asset_id: string;
+  name: string;
+  version: string | null;
+  publisher: string | null;
+  install_date: string | null;
 }
 
 export interface CreateAssetDto {
@@ -87,6 +114,9 @@ export interface CreateAssetDto {
   notes: string | null;
   warranty_start: string | null;
   warranty_end: string | null;
+  purchase_cost?: number | null;
+  purchase_date?: string | null;
+  vendor_id?: string | null;
 }
 
 export type UpdateAssetDto = Partial<CreateAssetDto>;
@@ -507,3 +537,69 @@ export interface SaveD4SignConfigDto {
   envio_automatico: boolean;
   mensagem_email?: string;
 }
+
+// Fornecedores
+export interface Vendor {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateVendorDto {
+  name: string;
+  contact_name?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  notes?: string;
+}
+
+export type UpdateVendorDto = Partial<CreateVendorDto>;
+
+// Licenças de Software
+export type LicenseType = 'PER_SEAT' | 'OEM' | 'SUBSCRIPTION' | 'OPEN';
+
+export interface SoftwareLicense {
+  id: string;
+  name: string;
+  publisher: string | null;
+  license_type: LicenseType;
+  quantity_purchased: number;
+  cost_per_unit: number | null;
+  purchase_date: string | null;
+  expiry_date: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SoftwareLicenseUsage {
+  id: string;
+  name: string;
+  publisher: string | null;
+  license_type: LicenseType;
+  quantity_purchased: number;
+  quantity_installed: number;
+  cost_per_unit: number | null;
+  expiry_date: string | null;
+  notes: string;
+}
+
+export interface CreateSoftwareLicenseDto {
+  name: string;
+  publisher?: string;
+  license_type?: LicenseType;
+  quantity_purchased: number;
+  cost_per_unit?: number;
+  purchase_date?: string;
+  expiry_date?: string;
+  notes?: string;
+}
+
+export type UpdateSoftwareLicenseDto = Partial<CreateSoftwareLicenseDto>;

@@ -30,6 +30,10 @@ pub struct Asset {
     pub is_training: bool,
     pub warranty_start: Option<String>,
     pub warranty_end: Option<String>,
+    pub purchase_cost: Option<f64>,
+    pub purchase_date: Option<String>,
+    pub vendor_id: Option<String>,
+    pub vendor_name: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -67,6 +71,9 @@ pub struct CreateAssetDto {
     pub notes: Option<String>,
     pub warranty_start: Option<String>,
     pub warranty_end: Option<String>,
+    pub purchase_cost: Option<f64>,
+    pub purchase_date: Option<String>,
+    pub vendor_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +93,9 @@ pub struct UpdateAssetDto {
     pub notes: Option<String>,
     pub warranty_start: Option<String>,
     pub warranty_end: Option<String>,
+    pub purchase_cost: Option<f64>,
+    pub purchase_date: Option<String>,
+    pub vendor_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -547,4 +557,124 @@ pub struct SaveD4SignConfigDto {
     pub base_url: Option<String>,
     pub envio_automatico: bool,
     pub mensagem_email: Option<String>,
+}
+
+// ============================================================
+// OCS Inventory — dados em tempo real
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetLiveData {
+    pub asset_id: String,
+    pub hostname: Option<String>,
+    pub ip_address: Option<String>,
+    pub last_logged_user: Option<String>,
+    pub ocs_last_seen: Option<String>,
+    pub ocs_synced_at: Option<String>,
+    pub ram_total_mb: Option<i64>,
+    pub disk_c_total_mb: Option<i64>,
+    pub disk_c_free_mb: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetSoftware {
+    pub id: String,
+    pub asset_id: String,
+    pub name: String,
+    pub version: Option<String>,
+    pub publisher: Option<String>,
+    pub install_date: Option<String>,
+}
+
+// ============================================================
+// Fornecedores
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Vendor {
+    pub id: String,
+    pub name: String,
+    pub contact_name: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub notes: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateVendorDto {
+    pub name: String,
+    pub contact_name: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateVendorDto {
+    pub name: Option<String>,
+    pub contact_name: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub notes: Option<String>,
+}
+
+// ============================================================
+// Licenças de Software
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SoftwareLicense {
+    pub id: String,
+    pub name: String,
+    pub publisher: Option<String>,
+    pub license_type: String,
+    pub quantity_purchased: i64,
+    pub cost_per_unit: Option<f64>,
+    pub purchase_date: Option<String>,
+    pub expiry_date: Option<String>,
+    pub notes: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SoftwareLicenseUsage {
+    pub id: String,
+    pub name: String,
+    pub publisher: Option<String>,
+    pub license_type: String,
+    pub quantity_purchased: i64,
+    pub quantity_installed: i64,
+    pub cost_per_unit: Option<f64>,
+    pub expiry_date: Option<String>,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateSoftwareLicenseDto {
+    pub name: String,
+    pub publisher: Option<String>,
+    pub license_type: Option<String>,
+    pub quantity_purchased: i64,
+    pub cost_per_unit: Option<f64>,
+    pub purchase_date: Option<String>,
+    pub expiry_date: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateSoftwareLicenseDto {
+    pub name: Option<String>,
+    pub publisher: Option<String>,
+    pub license_type: Option<String>,
+    pub quantity_purchased: Option<i64>,
+    pub cost_per_unit: Option<f64>,
+    pub purchase_date: Option<String>,
+    pub expiry_date: Option<String>,
+    pub notes: Option<String>,
 }

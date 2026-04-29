@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText, PackageX, X, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, QrCode, FileSignature, Send, CheckCircle2, Clock, XCircle, FileText, PackageX, X, RotateCcw, Monitor, Cpu, HardDrive, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge, TypeBadge, StorageBadge } from '@/components/ui/Badge';
@@ -9,13 +9,13 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useRBAC } from '@/hooks/useRBAC';
-import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo, criarDescarte, reativarAtivo } from '@/data/commands';
+import { obterAtivo, excluirAtivo, listarMovimentosPorAtivo, listarAnexos, listarDesligamentosPorAtivo, listarTermosPorAtivo, criarTermo, criarDescarte, reativarAtivo, obterLiveData, listarSoftwaresAtivo } from '@/data/commands';
 import { AttachmentManager } from './AttachmentManager';
 import { AssetTimeline } from './AssetTimeline';
 import { QRCodeLabel } from './QRCodeLabel';
 import { formatDateTime, formatStorage } from '@/lib/utils';
 import { UserX } from 'lucide-react';
-import type { Asset, Movement, AssetAttachment, Desligamento, Termo, DescarteMotivo } from '@/domain/models';
+import type { Asset, Movement, AssetAttachment, Desligamento, Termo, DescarteMotivo, AssetLiveData, AssetSoftware } from '@/domain/models';
 
 export const AssetDetail: React.FC = () => {
   const { detailAssetId, navigateTo, editAsset } = useAppStore();
@@ -39,6 +39,9 @@ export const AssetDetail: React.FC = () => {
   const [descarteData, setDescarteData] = useState('');
   const [descarteObs, setDescarteObs] = useState('');
   const [savingDescarte, setSavingDescarte] = useState(false);
+  const [liveData, setLiveData] = useState<AssetLiveData | null>(null);
+  const [softwares, setSoftwares] = useState<AssetSoftware[]>([]);
+  const [showSoftwares, setShowSoftwares] = useState(false);
 
   const loadData = async () => {
     if (!detailAssetId) return;
@@ -73,6 +76,18 @@ export const AssetDetail: React.FC = () => {
       setTermos(t);
     } catch {
       setTermos([]);
+    }
+    try {
+      const ld = await obterLiveData(detailAssetId);
+      setLiveData(ld);
+    } catch {
+      setLiveData(null);
+    }
+    try {
+      const sw = await listarSoftwaresAtivo(detailAssetId);
+      setSoftwares(sw);
+    } catch {
+      setSoftwares([]);
     }
     setLoading(false);
   };
@@ -275,12 +290,57 @@ export const AssetDetail: React.FC = () => {
             value={`${formatStorage(asset.storage_capacity_gb)}`}
             extra={<StorageBadge type={asset.storage_type} />}
           />
-          <DetailField label="Sistema Operacional" value={asset.os || '—'} />
+          <DetailField
+            label="Sistema Operacional"
+            value={asset.os || '—'}
+            extra={
+              /windows\s*(xp|vista|7|8|8\.1|10)\b/i.test(asset.os)
+                ? <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">EOL</span>
+                : undefined
+            }
+          />
           <DetailField label="Processador" value={asset.cpu || '—'} />
           <DetailField label="Modelo" value={asset.model || '—'} />
           <DetailField label="Ano" value={asset.year ? String(asset.year) : '—'} />
           <DetailField label="Criado em" value={formatDateTime(asset.created_at)} />
           <DetailField label="Atualizado em" value={formatDateTime(asset.updated_at)} />
+          {(asset.warranty_start || asset.warranty_end) && (
+            <>
+              <DetailField label="Início da Garantia" value={asset.warranty_start ? new Date(asset.warranty_start).toLocaleDateString('pt-BR') : '—'} />
+              <DetailField label="Fim da Garantia" value={asset.warranty_end ? new Date(asset.warranty_end).toLocaleDateString('pt-BR') : '—'} extra={
+                asset.warranty_end && new Date(asset.warranty_end) < new Date()
+                  ? <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">VENCIDA</span>
+                  : asset.warranty_end && (new Date(asset.warranty_end).getTime() - Date.now()) < 90 * 86400000
+                  ? <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">A VENCER</span>
+                  : undefined
+              } />
+            </>
+          )}
+          {/* Financeiro */}
+          {asset.purchase_cost != null && (
+            <DetailField
+              label="Valor de Compra"
+              value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(asset.purchase_cost)}
+            />
+          )}
+          {asset.purchase_date && (
+            <DetailField
+              label="Data de Compra"
+              value={new Date(asset.purchase_date).toLocaleDateString('pt-BR')}
+              extra={(() => {
+                const years = (Date.now() - new Date(asset.purchase_date).getTime()) / (365.25 * 86400000);
+                const currentValue = Math.max(0, asset.purchase_cost! * (1 - 0.20 * years));
+                return asset.purchase_cost != null ? (
+                  <span className="text-xs text-slate-400">
+                    Valor atual: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentValue)}
+                  </span>
+                ) : undefined;
+              })()}
+            />
+          )}
+          {asset.vendor_name && (
+            <DetailField label="Fornecedor" value={asset.vendor_name} />
+          )}
         </div>
 
         {/* Observações */}
@@ -295,6 +355,104 @@ export const AssetDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Saúde da Máquina (OCS) */}
+      {liveData && (liveData.hostname || liveData.ip_address || liveData.ram_total_mb != null) && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Monitor className="h-4 w-4 text-agro-600" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Saúde da Máquina</h3>
+            {liveData.ocs_synced_at && (
+              <span className="ml-auto text-xs text-slate-400">
+                Sincronizado: {new Date(liveData.ocs_synced_at.replace('Z', '')).toLocaleString('pt-BR')}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {liveData.hostname && <DetailField label="Hostname" value={liveData.hostname} />}
+            {liveData.ip_address && <DetailField label="Endereço IP" value={liveData.ip_address} />}
+            {liveData.last_logged_user && <DetailField label="Último Usuário" value={liveData.last_logged_user} />}
+            {liveData.ocs_last_seen && <DetailField label="Última vez visto" value={new Date(liveData.ocs_last_seen.replace('Z', '')).toLocaleString('pt-BR')} />}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {liveData.ram_total_mb != null && (
+              <div>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                  <Cpu className="h-3 w-3" /> RAM
+                </p>
+                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-agro-500 transition-all"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">{Math.round(liveData.ram_total_mb / 1024)} GB total</p>
+              </div>
+            )}
+            {liveData.disk_c_total_mb != null && liveData.disk_c_free_mb != null && (
+              <div>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                  <HardDrive className="h-3 w-3" /> Disco C:
+                </p>
+                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      ((liveData.disk_c_total_mb - liveData.disk_c_free_mb) / liveData.disk_c_total_mb) > 0.85
+                        ? 'bg-red-500'
+                        : ((liveData.disk_c_total_mb - liveData.disk_c_free_mb) / liveData.disk_c_total_mb) > 0.70
+                        ? 'bg-amber-500'
+                        : 'bg-agro-500'
+                    }`}
+                    style={{ width: `${Math.round(((liveData.disk_c_total_mb - liveData.disk_c_free_mb) / liveData.disk_c_total_mb) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {Math.round((liveData.disk_c_total_mb - liveData.disk_c_free_mb) / 1024)} GB usados de {Math.round(liveData.disk_c_total_mb / 1024)} GB
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Softwares Instalados */}
+      {softwares.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowSoftwares(!showSoftwares)}
+            className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-slate-500" />
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Softwares Instalados
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                {softwares.length}
+              </span>
+            </div>
+            {showSoftwares ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+          </button>
+          {showSoftwares && (
+            <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 max-h-96 overflow-y-auto">
+              {softwares.map((sw) => (
+                <div key={sw.id} className="px-6 py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-800 dark:text-slate-200 truncate">{sw.name}</p>
+                    {sw.publisher && (
+                      <p className="text-xs text-slate-400 truncate">{sw.publisher}</p>
+                    )}
+                  </div>
+                  {sw.version && (
+                    <span className="flex-shrink-0 text-xs text-slate-400 font-mono">{sw.version}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Historico de desligamentos */}
       {desligamentos.length > 0 && (

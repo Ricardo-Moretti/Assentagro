@@ -4,14 +4,14 @@
     "port": 3306,
     "database": "ocsweb",
     "user": "ocs",
-    "password": "PREENCHER_SENHA_OCS"
+    "password": "citrix54"
   },
   "assetagro": {
     "host": "192.168.90.5",
     "port": 3306,
     "database": "assetagro",
     "user": "assetagro",
-    "password": "PREENCHER_SENHA_ASSETAGRO"
+    "password": "P"
   },
   "sync": {
     "stale_days": 90,
