@@ -79,13 +79,13 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
             { "name": "x-webhook-key", "value": "445f35592e9fe8fc39fb41a47a3435b34eec21b09ac44d049c4f3f0ecb1fbe5d" }
           ]
         },
         "sendBody": true,
-        "contentType": "raw",
-        "rawBody": "{ \"path\": \"/initSession\", \"method\": \"GET\" }",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{\"path\":\"/initSession\",\"method\":\"GET\"}",
         "options": {}
       },
       "id": "node-glpi-init",
@@ -102,13 +102,13 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
             { "name": "x-webhook-key", "value": "445f35592e9fe8fc39fb41a47a3435b34eec21b09ac44d049c4f3f0ecb1fbe5d" }
           ]
         },
         "sendBody": true,
-        "contentType": "raw",
-        "rawBody": "={{ JSON.stringify({ path: '/search/Ticket?criteria[0][field]=7&criteria[0][searchtype]=equals&criteria[0][value]=442&criteria[1][link]=AND&criteria[1][field]=12&criteria[1][searchtype]=equals&criteria[1][value]=notold&forcedisplay[0]=1&forcedisplay[1]=2&forcedisplay[2]=21&range=0-100&sort=1&order=DESC', method: 'GET', headers: { 'Session-Token': $('GLPI initSession').first().json.session_token } }) }}",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ path: '/search/Ticket?criteria[0][field]=7&criteria[0][searchtype]=equals&criteria[0][value]=442&criteria[1][link]=AND&criteria[1][field]=12&criteria[1][searchtype]=equals&criteria[1][value]=notold&forcedisplay[0]=1&forcedisplay[1]=2&forcedisplay[2]=21&range=0-100&sort=1&order=DESC', method: 'GET', headers: { 'Session-Token': $('GLPI initSession').first().json.session_token } }) }}",
         "options": {}
       },
       "id": "node-glpi-search",
@@ -172,13 +172,13 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
             { "name": "x-webhook-key", "value": "445f35592e9fe8fc39fb41a47a3435b34eec21b09ac44d049c4f3f0ecb1fbe5d" }
           ]
         },
         "sendBody": true,
-        "contentType": "raw",
-        "rawBody": "={{ JSON.stringify({ path: '/ITILFollowup', method: 'POST', headers: { 'Session-Token': $json.sessionToken }, body: { input: { items_id: $json.ticketId, itemtype: 'Ticket', content: $json.nota, is_private: 0 } } }) }}",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ path: '/ITILFollowup', method: 'POST', headers: { 'Session-Token': $json.sessionToken }, body: { input: { items_id: $json.ticketId, itemtype: 'Ticket', content: $json.nota, is_private: 0 } } }) }}",
         "options": {
           "response": {
             "response": {
